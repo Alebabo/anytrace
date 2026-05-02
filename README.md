@@ -29,8 +29,15 @@ cp .env.example .env.local
 npm run dev
 ```
 
+For magic-link auth, set `VITE_SITE_URL` to the exact URL Supabase should redirect back to.
+Examples:
+
+- local: `http://localhost:8080`
+- Vercel: `https://your-app.vercel.app`
+
 ## Notes
 
 - The old legacy API dependency has been removed from the active product flow.
+- Legacy build-tool leftovers have been removed.
 - Stripe checkout is intentionally not live yet; the app already models trial/subscription state in Supabase and gates access after trial expiry.
 - LinkedIn is present in the schema and UI profile links, but full ingestion is deferred.

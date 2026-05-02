@@ -201,7 +201,9 @@ export function useAccessState() {
 export function useMagicLinkSignIn() {
   return useMutation({
     mutationFn: async (email: string) => {
-      const redirectTo = window.location.origin;
+      const redirectTo =
+        (import.meta.env.VITE_SITE_URL as string | undefined)?.trim() ||
+        window.location.origin;
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: redirectTo },
