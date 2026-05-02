@@ -1,9 +1,5 @@
 import type { PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 
-function fallbackAvatar(name: string, size = 160) {
-  return `https://avatar.vercel.sh/${encodeURIComponent(name)}?size=${size}`;
-}
-
 function parseLinkedinResource(linkedinUrl?: string | null) {
   if (!linkedinUrl) return null;
 
@@ -29,13 +25,13 @@ function unavatarLinkedin(linkedinUrl?: string | null, fallbackName?: string) {
   const resource = parseLinkedinResource(linkedinUrl);
   if (!resource) return null;
 
-  const fallback = fallbackName ? `&fallback=${encodeURIComponent(fallbackAvatar(fallbackName))}` : "";
+  const fallback = fallbackName ? "&fallback=false" : "";
   return `https://unavatar.io/linkedin/${resource.type}:${resource.key}?ttl=7d${fallback}`;
 }
 
 function unavatarX(handle?: string | null, fallbackName?: string) {
   if (!handle) return null;
-  const fallback = fallbackName ? `?fallback=${encodeURIComponent(fallbackAvatar(fallbackName))}` : "";
+  const fallback = fallbackName ? "?fallback=false" : "";
   return `https://unavatar.io/x/${handle}${fallback}`;
 }
 
@@ -54,7 +50,6 @@ export function avatarSourcesForPerson(person: TrackedPerson, identities: Person
     githubAvatar(github),
     unavatarX(x, person.fullName),
     unavatarLinkedin(linkedin, person.fullName),
-    fallbackAvatar(person.fullName),
   ].filter((value): value is string => !!value);
 }
 
@@ -65,6 +60,5 @@ export function avatarSourcesForVc(vc: VcSource) {
     unavatarLinkedin(vc.linkedinUrl, vc.name),
     vc.githubUsername ? githubAvatar(vc.githubUsername) : null,
     unavatarX(xHandle, vc.name),
-    fallbackAvatar(vc.name),
   ].filter((value): value is string => !!value);
 }
