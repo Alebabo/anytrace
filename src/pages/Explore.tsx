@@ -274,7 +274,7 @@ function GraphInner() {
     const filteredEdges = graph.edges.filter((edge) => personIds.has(edge.targetId));
     const vcIds = new Set(filteredEdges.map((edge) => edge.sourceId));
     const activeNodeId = selectedNodeId;
-    const visibleVcs = graph.vcs.filter((vc) => vcIds.has(vc.id) || !filteredEdges.length);
+    const visibleVcs = graph.vcs;
     const siblingOrderByEdgeId = new Map<string, number>();
     const siblingCountBySource = new Map<string, number>();
     const edgesBySource = new Map<string, typeof filteredEdges>();
@@ -317,7 +317,7 @@ function GraphInner() {
           kind: "vc",
           vc,
           highlight: vcIds.has(vc.id),
-          dim: !vcIds.has(vc.id) && personIds.size > 0,
+          dim: false,
         },
       });
     });
@@ -378,6 +378,7 @@ function GraphInner() {
   const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
   const requiresSelection = viewMode === "selected";
   const hasEdges = (graph?.edges.length ?? 0) > 0;
+  const hasRenderableNodes = (graph?.vcs.length ?? 0) > 0 || (graph?.people.length ?? 0) > 0;
   const showingFallback = graph?.graphSource === "fallback";
   const graphIsPartial = showingFallback || (graph?.orphanedEventCount ?? 0) > 0;
 
@@ -448,10 +449,10 @@ function GraphInner() {
             title="No VCs selected yet"
             body="Add a few venture accounts in Watchlist first. The graph only renders edges from your personal VC selection."
           />
-        ) : !hasEdges ? (
+        ) : !hasRenderableNodes ? (
           <EmptyGraphState
-            title="No signal edges yet"
-            body="Your selected VCs are saved, but there are no imported X follow events for them yet. Once sync jobs start writing activity events, the graph will light up automatically."
+            title="Nothing to show yet"
+            body="Anytrace could not find visible VC or people nodes for this graph view yet."
           />
         ) : (
           <ReactFlow
@@ -498,6 +499,11 @@ function GraphInner() {
                 <span>{graph?.edges.length ?? 0} active edges</span>
               </div>
             </div>
+            {!hasEdges && (
+              <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
+                All VCs and tracked people are visible, but there are no live signal connections between them yet.
+              </div>
+            )}
             {showingFallback && (
               <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
                 No direct edges were found for your current watchlist, so Anytrace is temporarily showing valid legacy VC-follow connections while the live VC mapping catches up.
