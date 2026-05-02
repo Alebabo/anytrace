@@ -37,12 +37,19 @@ function identityFor(
 function VcNode({ data }: NodeProps<Node<GraphNodeData>>) {
   if (data.kind !== "vc") return null;
   return (
-    <div
-      className={`cursor-pointer rounded-full bg-background ring-1 ring-border p-1 transition-all ${
-        data.highlight ? "ring-2 ring-accent-indigo shadow-md scale-110" : ""
-      } ${data.dim ? "opacity-30" : ""}`}
-    >
-      <EntityAvatar name={data.vc.name} githubUsername={data.vc.githubUsername ?? undefined} size={48} />
+    <div className="relative">
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!h-2.5 !w-2.5 !border-2 !border-background !bg-foreground"
+      />
+      <div
+        className={`cursor-pointer rounded-full bg-background ring-1 ring-border p-1 transition-all ${
+          data.highlight ? "ring-2 ring-accent-indigo shadow-md scale-110" : ""
+        } ${data.dim ? "opacity-30" : ""}`}
+      >
+        <EntityAvatar name={data.vc.name} githubUsername={data.vc.githubUsername ?? undefined} size={48} />
+      </div>
     </div>
   );
 }
