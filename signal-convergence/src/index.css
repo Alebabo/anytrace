@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,9 +7,6 @@
 /* Anytrace — Project A × Yellow VC brand
  * Dark petrol/teal background, yellow accent, monospace + geometric sans.
  */
-
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
-
 @layer base {
   :root {
     /* Light — Project A × Yellow VC */
