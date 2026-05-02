@@ -39,31 +39,48 @@ supabase link --project-ref mfwqhsfmgwzvkodgkrgd
 npm run dev
 ```
 
-## Sync functions
+## Serverless backend
 
-Anytrace now includes two scheduled sync functions:
+The repo now includes Vercel API routes for ingest and billing:
 
-- `sync-x-follows`
-- `sync-github-signals`
+- `POST /api/sync/x`
+- `POST /api/sync/github`
+- `POST /api/sync/media-backfill`
+- `POST /api/stripe/checkout`
+- `POST /api/stripe/webhook`
 
-They expect these server-side env vars in Supabase:
+The sync routes accept either:
 
-- `X_BEARER_TOKEN`
-- `GITHUB_TOKEN`
-- `SUPABASE_URL`
+- a signed-in Supabase bearer token for manual runs
+- Vercel Cron requests
+- `x-cron-secret: $CRON_SECRET` for non-Cron manual automation
+
+Required server-side env vars:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- optional `GITHUB_IMPORTANCE_THRESHOLD`
-- optional `GITHUB_STAR_DELTA_THRESHOLD`
+- `TWITTERAPI_IO_KEY`
+- `GITHUB_TOKEN`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
 
-Recommended scheduling:
+Useful optional env vars:
 
-- `sync-x-follows`: every 30-60 minutes
-- `sync-github-signals`: every 2-6 hours
+- `TWITTERAPI_IO_MIN_INTERVAL_MS`
+- `X_FOLLOWINGS_PAGE_SIZE`
+- `X_MAX_FOLLOWING_PAGES_PER_SYNC`
+- `X_MAX_VCS_PER_SYNC`
+- `GITHUB_SEARCH_RESULT_LIMIT`
+- `GITHUB_VIRAL_STAR_DELTA_THRESHOLD`
+- `STRIPE_PRO_PRICE_USD`
+- `CRON_SECRET`
+
+`vercel.json` schedules the three sync routes daily by default.
 
 ## Notes
 
 - The graph only shows signals from the VCs a user selected in Watchlist.
 - Demo mode bypasses Magic Link locally and uses seeded Anytrace data.
-- X v1 focuses on new follows from selected VC accounts.
-- GitHub v1 focuses on repo traction plus important new followers.
+- X sync now snapshots full following lists and stores only new-follow diffs as signals.
+- GitHub sync now searches for viral repositories, stores star deltas, and marks cross-referenced people as high-confidence.
 - LinkedIn stays in the schema and UI links, but full ingest is deferred.

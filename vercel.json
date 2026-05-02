@@ -1,0 +1,28 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync/x",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/sync/github",
+      "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/sync/media-backfill",
+      "schedule": "30 9 * * *"
+    }
+  ]
+}
