@@ -159,9 +159,21 @@ export interface GraphEdge {
   platform: ActivityPlatform;
   eventCount: number;
   isTopPick: boolean;
+  graphSource: "direct" | "fallback";
 }
 
 export interface WatchlistData {
   selectedVcs: UserVcWatchlistItem[];
   people: WatchlistPerson[];
+}
+
+export interface GraphData {
+  vcs: VcSource[];
+  people: TrackedPerson[];
+  events: ActivityEvent[];
+  weeklyPicks: WeeklyPick[];
+  edges: GraphEdge[];
+  hasSelectedVcs: boolean;
+  graphSource: "direct" | "fallback" | "empty";
+  orphanedEventCount: number;
 }

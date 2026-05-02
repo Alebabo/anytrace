@@ -194,6 +194,8 @@ function GraphInner() {
 
   const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
   const hasEdges = (graph?.edges.length ?? 0) > 0;
+  const showingFallback = graph?.graphSource === "fallback";
+  const graphIsPartial = showingFallback || (graph?.orphanedEventCount ?? 0) > 0;
 
   return (
     <ProductGate
@@ -223,7 +225,7 @@ function GraphInner() {
             </Button>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
-              Selected VCs only
+              {showingFallback ? "Fallback signal view" : "Selected VCs only"}
             </div>
           </div>
         </div>
@@ -271,19 +273,38 @@ function GraphInner() {
         )}
 
         {!graphQuery.isLoading && hasSelectedVcs && (
-          <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-10 rounded-full border border-border bg-background px-4 py-2 shadow-sm text-xs">
-            <div className="flex items-center gap-3">
-              <span>{graph?.vcs.length ?? 0} selected VCs</span>
-              <span>/</span>
-              <span>{graph?.people.length ?? 0} connected people</span>
-              <span>/</span>
-              <span>{graph?.edges.length ?? 0} active edges</span>
+          <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-10 space-y-2">
+            <div className="rounded-full border border-border bg-background px-4 py-2 shadow-sm text-xs">
+              <div className="flex items-center gap-3">
+                <span>{graph?.vcs.length ?? 0} selected VCs</span>
+                <span>/</span>
+                <span>{graph?.people.length ?? 0} connected people</span>
+                <span>/</span>
+                <span>{graph?.edges.length ?? 0} active edges</span>
+              </div>
             </div>
+            {showingFallback && (
+              <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
+                No direct edges were found for your current watchlist, so Anytrace is temporarily showing valid legacy VC-follow connections while the live VC mapping catches up.
+              </div>
+            )}
+            {!showingFallback && (graph?.orphanedEventCount ?? 0) > 0 && (
+              <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
+                {graph?.orphanedEventCount} event{graph?.orphanedEventCount === 1 ? "" : "s"} still point to deleted VC rows and were filtered out of the graph.
+              </div>
+            )}
           </div>
         )}
 
         {!graphQuery.isLoading && (selectedPerson || selectedVc) && (
           <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-10 w-[340px] max-w-[calc(100vw-1.5rem)] rounded-[28px] border border-border bg-background p-5 shadow-xl">
+            {graphIsPartial && (
+              <div className="mb-4 rounded-2xl bg-surface-sunken px-3 py-2 text-[11px] text-muted-foreground">
+                {showingFallback
+                  ? "This node is rendered from fallback graph data while live watchlist edges are being repaired."
+                  : "This node is partially backed by live data. Some orphaned VC events were filtered out."}
+              </div>
+            )}
             {selectedPerson && (
               <div>
                 <div className="flex items-start justify-between gap-4">
@@ -318,7 +339,18 @@ function GraphInner() {
                   {selectedPersonEvents.map((event) => (
                     <div key={event.id} className="rounded-2xl bg-surface-sunken px-3 py-2">
                       <div className="text-xs font-medium">{event.headline}</div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">{event.eventType}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {event.eventType}
+                        {event.vcSourceId &&
+                        graph?.edges.some(
+                          (edge) =>
+                            edge.sourceId === event.vcSourceId &&
+                            edge.targetId === selectedPerson.id &&
+                            edge.graphSource === "fallback",
+                        )
+                          ? " / fallback edge"
+                          : ""}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -352,6 +384,7 @@ function GraphInner() {
                 )}
                 <div className="mt-4 text-xs text-muted-foreground">
                   {selectedVcConnections.length} connected people
+                  {selectedVc.twitterUrl ? " / X tracked" : ""}
                 </div>
                 <div className="mt-3 space-y-2">
                   {selectedVcConnections.slice(0, 4).map((person) => (

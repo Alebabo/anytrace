@@ -13,6 +13,7 @@ import {
 } from "@/data/demoAnytrace";
 import type {
   ActivityEvent,
+  GraphData,
   GraphEdge,
   PersonIdentity,
   TrackedPerson,
@@ -765,7 +766,7 @@ export function useGraphData(enabled = true) {
   const eventsQuery = useActivityEvents(enabled);
 
   return {
-    data: useMemo(() => {
+    data: useMemo<GraphData | null>(() => {
       if (!selectedVcsQuery.data || !vcSourcesQuery.data || !peopleQuery.data || !eventsQuery.data) {
         return null;
       }
@@ -773,17 +774,26 @@ export function useGraphData(enabled = true) {
       const selectedVcs = selectedVcsQuery.data.map((item) => item.vcSource);
       const allVcs = vcSourcesQuery.data;
       const selectedVcIds = new Set(selectedVcs.map((vc) => vc.id));
+      const validVcIds = new Set(allVcs.map((vc) => vc.id));
       const topPickIds = new Set((picksQuery.data ?? []).map((pick) => pick.person.id));
       const edgeMap = new Map<string, GraphEdge>();
-      const directEvents = eventsQuery.data.filter(
-        (item) => item.vcSourceId && selectedVcIds.has(item.vcSourceId),
+      const validEvents = eventsQuery.data.filter(
+        (item) => item.vcSourceId && validVcIds.has(item.vcSourceId),
       );
-      const fallbackEvents =
+      const orphanedEventCount = eventsQuery.data.filter(
+        (item) => item.vcSourceId && !validVcIds.has(item.vcSourceId),
+      ).length;
+      const directEvents = validEvents.filter((item) => selectedVcIds.has(item.vcSourceId!));
+      const fallbackOnlyEvents = validEvents.filter((item) => item.eventType === "vc_follow");
+      const graphEvents = directEvents.length > 0 ? directEvents : fallbackOnlyEvents;
+      const graphSource =
         directEvents.length > 0
-          ? directEvents
-          : eventsQuery.data.filter((item) => item.vcSourceId && item.eventType === "vc_follow");
+          ? "direct"
+          : fallbackOnlyEvents.length > 0
+            ? "fallback"
+            : "empty";
 
-      for (const event of fallbackEvents) {
+      for (const event of graphEvents) {
         const key = `${event.vcSourceId}-${event.personId}-${event.platform}`;
         const existing = edgeMap.get(key);
         if (existing) {
@@ -797,6 +807,7 @@ export function useGraphData(enabled = true) {
           platform: event.platform,
           eventCount: 1,
           isTopPick: topPickIds.has(event.personId),
+          graphSource: graphSource === "direct" ? "direct" : "fallback",
         });
       }
 
@@ -819,6 +830,8 @@ export function useGraphData(enabled = true) {
         weeklyPicks: picksQuery.data ?? [],
         edges: Array.from(edgeMap.values()),
         hasSelectedVcs: selectedVcs.length > 0,
+        graphSource,
+        orphanedEventCount,
       };
     }, [eventsQuery.data, peopleQuery.data, picksQuery.data, selectedVcsQuery.data, vcSourcesQuery.data]),
     isLoading:
