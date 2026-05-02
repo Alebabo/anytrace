@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Background,
@@ -8,12 +8,13 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Edge,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ExternalLink, Filter, Flame, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Filter, Flame, Search, Users2 } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,7 @@ function buildGraphLayout({
 
 function GraphInner() {
   const navigate = useNavigate();
+  const reactFlow = useReactFlow();
   const { access } = useAccessState();
   const [viewMode, setViewMode] = useState<"selected" | "all">("selected");
   const graphQuery = useGraphData(access.isAuthenticated, viewMode);
@@ -258,6 +260,7 @@ function GraphInner() {
   const [showOnlyTop, setShowOnlyTop] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [positionOverrides, setPositionOverrides] = useState<Record<string, GraphPosition>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const graph = graphQuery.data;
   const identities = identitiesQuery.data ?? [];
@@ -413,6 +416,37 @@ function GraphInner() {
     return { nodes: [...vcNodes, ...personNodes], edges };
   }, [graph, identities, positionOverrides, query, selectedNodeId, showOnlyTop]);
 
+  const focusNode = useCallback(
+    (nodeId: string) => {
+      const node = built.nodes.find((entry) => entry.id === nodeId);
+      if (!node) return;
+
+      const size =
+        node.data.kind === "vc"
+          ? getVcNodeSize(node.data.vc.sizeLabel) + 12
+          : node.data.topPick
+            ? 64
+            : 48;
+
+      reactFlow.setCenter(node.position.x + size / 2, node.position.y + size / 2, {
+        zoom: 0.82,
+        duration: 500,
+      });
+    },
+    [built.nodes, reactFlow],
+  );
+
+  const overviewPeople = useMemo(() => {
+    if (!graph) return [];
+    const topPickIds = new Set(graph.weeklyPicks.map((pick) => pick.person.id));
+
+    return [...graph.people].sort((left, right) => {
+      const topDiff = Number(topPickIds.has(right.id)) - Number(topPickIds.has(left.id));
+      if (topDiff !== 0) return topDiff;
+      return left.fullName.localeCompare(right.fullName);
+    });
+  }, [graph]);
+
   const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
   const requiresSelection = viewMode === "selected";
   const hasEdges = (graph?.edges.length ?? 0) > 0;
@@ -473,6 +507,83 @@ function GraphInner() {
           </div>
         </div>
 
+        {!graphQuery.isLoading && hasRenderableNodes && (
+          <div
+            className={`absolute left-3 top-16 bottom-3 z-10 pointer-events-auto transition-all duration-300 md:left-4 md:top-20 md:bottom-4 ${
+              sidebarOpen ? "w-[320px]" : "w-12"
+            }`}
+          >
+            <div className="flex h-full">
+              <div
+                className={`h-full overflow-hidden rounded-[28px] border border-border bg-background/95 shadow-xl backdrop-blur transition-all duration-300 ${
+                  sidebarOpen ? "w-[272px] p-4" : "w-0 p-0 border-0"
+                }`}
+              >
+                {sidebarOpen && (
+                  <div className="flex h-full flex-col">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Users2 className="h-4 w-4" />
+                          People overview
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                          Click a person to focus them in the graph.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2 overflow-y-auto pr-1">
+                      {overviewPeople.map((person) => {
+                        const personIdentities = identities.filter((identity) => identity.personId === person.id);
+                        const isSelected = selectedNodeId === person.id;
+
+                        return (
+                          <button
+                            key={person.id}
+                            type="button"
+                            className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors ${
+                              isSelected ? "bg-surface-sunken ring-1 ring-border" : "hover:bg-surface-sunken/70"
+                            }`}
+                            onClick={() => {
+                              setSelectedNodeId((current) => (current === person.id ? null : person.id));
+                              if (selectedNodeId !== person.id) {
+                                focusNode(person.id);
+                              }
+                            }}
+                          >
+                            <EntityAvatar
+                              name={person.fullName}
+                              imageUrls={avatarSourcesForPerson(person, personIdentities)}
+                              size={36}
+                              rounded="xl"
+                            />
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium">{person.fullName}</div>
+                              <div className="truncate text-[11px] text-muted-foreground">
+                                {person.company || person.roleTitle}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="ml-2 mt-3 h-10 w-10 shrink-0 rounded-full border border-border bg-background shadow-sm"
+                onClick={() => setSidebarOpen((current) => !current)}
+                aria-label={sidebarOpen ? "Collapse people sidebar" : "Expand people sidebar"}
+              >
+                {sidebarOpen ? <ChevronLeft className="mx-auto h-4 w-4" /> : <ChevronRight className="mx-auto h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+        )}
+
         {graphQuery.isLoading || identitiesQuery.isLoading ? (
           <div className="absolute inset-0 grid place-items-center">
             <Skeleton className="h-56 w-80 rounded-[28px]" />
@@ -505,7 +616,11 @@ function GraphInner() {
             nodesConnectable={false}
             nodesDraggable
             onNodeClick={(_, node) => {
-              setSelectedNodeId((current) => (current === node.id ? null : node.id));
+              setSelectedNodeId((current) => {
+                const next = current === node.id ? null : node.id;
+                if (next) focusNode(node.id);
+                return next;
+              });
             }}
             onNodeDragStop={(_, node) => {
               setPositionOverrides((current) => ({
@@ -651,7 +766,10 @@ function GraphInner() {
                       key={person.id}
                       type="button"
                       className="flex w-full items-center gap-3 rounded-2xl bg-surface-sunken px-3 py-2 text-left hover:bg-surface-sunken/80"
-                      onClick={() => setSelectedNodeId(person.id)}
+                      onClick={() => {
+                        setSelectedNodeId(person.id);
+                        focusNode(person.id);
+                      }}
                     >
                       <EntityAvatar
                         name={person.fullName}
