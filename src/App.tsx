@@ -9,6 +9,7 @@ import GraphPage from "@/pages/Explore";
 import WatchlistPage from "@/pages/Watchlist";
 import SettingsPage from "@/pages/Settings";
 import ConnectionDetail from "@/pages/Connections";
+import AuthConfirmPage from "@/pages/AuthConfirm";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/auth/confirm" element={<AuthConfirmPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<MainDashboard />} />
             <Route path="/graph" element={<GraphPage />} />
