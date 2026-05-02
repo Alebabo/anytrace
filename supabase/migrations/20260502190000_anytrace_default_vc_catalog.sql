@@ -7,7 +7,10 @@ update public.vc_sources
 set
   size_label = coalesce(size_label, title),
   sector_focus = coalesce(sector_focus, firm),
-  twitter_url = coalesce(twitter_url, case when x_handle is not null then 'https://twitter.com/' || x_handle else null end);
+  twitter_url = coalesce(
+    twitter_url,
+    case when x_handle is not null then 'https://twitter.com/' || x_handle else null end
+  );
 
 with new_seed_data (slug, name, country, size_label, sector_focus, twitter_url, linkedin_url) as (
   values

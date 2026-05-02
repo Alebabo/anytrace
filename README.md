@@ -18,15 +18,22 @@ npm install
 2. Copy the env file and add your Supabase values
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-3. Apply both Supabase migrations
+3. Link the repo to your Anytrace Supabase project
+
+```bash
+supabase link --project-ref mfwqhsfmgwzvkodgkrgd
+```
+
+4. Apply all Supabase migrations
 
 - `supabase/migrations/20260502093000_anytrace_v1.sql`
 - `supabase/migrations/20260502173000_anytrace_v11_watchlists_and_sync.sql`
+- `supabase/migrations/20260502190000_anytrace_default_vc_catalog.sql`
 
-4. Start the app
+5. Start the app
 
 ```bash
 npm run dev
