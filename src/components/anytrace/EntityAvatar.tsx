@@ -11,16 +11,12 @@ type Props = {
 function initialsOf(name: string) {
   return name
     .split(" ")
-    .map((p) => p[0])
+    .map((part) => part[0])
     .filter(Boolean)
     .slice(0, 2)
     .join("");
 }
 
-/**
- * Avatar that loads a GitHub profile picture when a username is provided,
- * and falls back to a clean initials bubble on error or when missing.
- */
 export function EntityAvatar({
   githubUsername,
   name,

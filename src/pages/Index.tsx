@@ -1,7 +1,7 @@
 import { ArrowUpRight, Github, Linkedin, Sparkles, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ProductGate } from "@/components/anytrace/ProductGate";
-import { EntityAvatar } from "@/components/converge/EntityAvatar";
+import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, usePersonIdentities, useWeeklyPicks } from "@/hooks/useAnytrace";

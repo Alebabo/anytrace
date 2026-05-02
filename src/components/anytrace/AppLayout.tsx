@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Settings, Menu, Network, Users, PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  Settings,
+  Menu,
+  Network,
+  Users,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LogOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -113,7 +122,7 @@ export default function AppLayout() {
                   alt="Yellow"
                   className="h-5 w-auto object-contain [filter:invert(1)_brightness(0.15)]"
                 />
-                <span className="text-muted-foreground text-sm">×</span>
+                <span className="text-muted-foreground text-sm">x</span>
                 <img
                   src={projectALogo}
                   alt="Project A"
@@ -160,15 +169,10 @@ export default function AppLayout() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="flex flex-col gap-0.5">
                 <span className="text-sm font-medium">{session?.user.email ?? "Signed out"}</span>
-                <span className="text-[11px] font-normal text-muted-foreground">
-                  Anytrace access
-                </span>
+                <span className="text-[11px] font-normal text-muted-foreground">Anytrace access</span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={!session || signOut.isPending}
-                onClick={() => signOut.mutate()}
-              >
+              <DropdownMenuItem disabled={!session || signOut.isPending} onClick={() => signOut.mutate()}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>

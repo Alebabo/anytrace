@@ -3,7 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import AppLayout from "@/components/converge/AppLayout";
+import AppLayout from "@/components/anytrace/AppLayout";
 import MainDashboard from "@/pages/Index";
 import GraphPage from "@/pages/Explore";
 import WatchlistPage from "@/pages/Watchlist";

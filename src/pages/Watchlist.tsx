@@ -1,6 +1,6 @@
 import { Github, Linkedin, Twitter } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
-import { EntityAvatar } from "@/components/converge/EntityAvatar";
+import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, useWatchlist } from "@/hooks/useAnytrace";
 import type { PersonIdentity, WatchlistPerson } from "@/data/anytrace";

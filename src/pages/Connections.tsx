@@ -2,10 +2,16 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ExternalLink, Github, Linkedin, Twitter } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
-import { EntityAvatar } from "@/components/converge/EntityAvatar";
+import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAccessState, useActivityEvents, usePersonIdentities, useTrackedPeople, useVcSources } from "@/hooks/useAnytrace";
+import {
+  useAccessState,
+  useActivityEvents,
+  usePersonIdentities,
+  useTrackedPeople,
+  useVcSources,
+} from "@/hooks/useAnytrace";
 import type { PersonIdentity } from "@/data/anytrace";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
@@ -91,9 +97,7 @@ export default function ConnectionDetail() {
                     The same proof layer now powers both weekly ranking and graph edges.
                   </p>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {events.length} events
-                </div>
+                <div className="text-sm text-muted-foreground">{events.length} events</div>
               </div>
 
               <ol className="space-y-4">

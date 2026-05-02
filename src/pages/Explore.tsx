@@ -13,9 +13,9 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Filter, Flame, Github, Linkedin, Search, Twitter } from "lucide-react";
+import { Filter, Flame, Search } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
-import { EntityAvatar } from "@/components/converge/EntityAvatar";
+import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,7 +184,7 @@ function GraphInner() {
             </Button>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
-              VCs → people
+              {"VCs -> people"}
             </div>
           </div>
         </div>
