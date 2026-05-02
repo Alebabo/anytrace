@@ -5,6 +5,10 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const githubToken = Deno.env.get("GITHUB_TOKEN")!;
 const importanceThreshold = Number(Deno.env.get("GITHUB_IMPORTANCE_THRESHOLD") ?? "700");
 const starDeltaThreshold = Number(Deno.env.get("GITHUB_STAR_DELTA_THRESHOLD") ?? "25");
+const maxUsersPerSync = Number(Deno.env.get("GITHUB_MAX_USERS_PER_SYNC") ?? "6");
+const maxReposPerUser = Number(Deno.env.get("GITHUB_MAX_REPOS_PER_USER") ?? "30");
+const maxFollowersPerUser = Number(Deno.env.get("GITHUB_MAX_FOLLOWERS_PER_USER") ?? "40");
+const maxImportanceChecksPerUser = Number(Deno.env.get("GITHUB_MAX_IMPORTANCE_CHECKS_PER_USER") ?? "8");
 
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -57,30 +61,31 @@ async function ghFetch<T>(path: string) {
   return (await response.json()) as T;
 }
 
-async function fetchAllFollowers(username: string) {
+async function fetchFollowers(username: string, limit: number) {
   const followers: GithubFollower[] = [];
   let page = 1;
-  while (true) {
+  while (followers.length < limit) {
+    const remaining = Math.min(100, limit - followers.length);
     const batch = await ghFetch<GithubFollower[]>(
-      `/users/${encodeURIComponent(username)}/followers?per_page=100&page=${page}`,
+      `/users/${encodeURIComponent(username)}/followers?per_page=${remaining}&page=${page}`,
     );
     followers.push(...batch);
-    if (batch.length < 100) break;
+    if (batch.length < remaining) break;
     page += 1;
   }
   return followers;
 }
 
-async function fetchRepos(username: string) {
+async function fetchRepos(username: string, limit = maxReposPerUser) {
   return await ghFetch<GithubRepo[]>(
-    `/users/${encodeURIComponent(username)}/repos?per_page=100&sort=updated`,
+    `/users/${encodeURIComponent(username)}/repos?per_page=${Math.min(limit, 100)}&sort=updated`,
   );
 }
 
 async function computeImportance(login: string) {
   const [profile, repos] = await Promise.all([
     ghFetch<GithubUser>(`/users/${encodeURIComponent(login)}`),
-    fetchRepos(login),
+    fetchRepos(login, 12),
   ]);
 
   const repoStars = repos
@@ -104,7 +109,9 @@ Deno.serve(async () => {
     let followerEvents = 0;
     const skippedUsers: Array<{ username: string; reason: string }> = [];
 
-    for (const identity of identities ?? []) {
+    const syncTargets = (identities ?? []).slice(0, maxUsersPerSync);
+
+    for (const identity of syncTargets) {
       const username = identity.handle;
       const personId = identity.person_id;
 
@@ -113,8 +120,8 @@ Deno.serve(async () => {
 
       try {
         [repos, followers] = await Promise.all([
-          fetchRepos(username),
-          fetchAllFollowers(username),
+          fetchRepos(username, maxReposPerUser),
+          fetchFollowers(username, maxFollowersPerUser),
         ]);
       } catch (error) {
         if (error instanceof GithubApiError && error.status === 404) {
@@ -196,6 +203,8 @@ Deno.serve(async () => {
         }
       }
 
+      let importanceChecks = 0;
+
       for (const follower of followers) {
         const existing = followerMap.get(follower.login);
         if (existing) {
@@ -206,7 +215,11 @@ Deno.serve(async () => {
           continue;
         }
 
-        const importanceScore = await computeImportance(follower.login);
+        let importanceScore = 0;
+        if (importanceChecks < maxImportanceChecksPerUser) {
+          importanceScore = await computeImportance(follower.login);
+          importanceChecks += 1;
+        }
         await supabase.from("person_github_follower_observations").insert({
           person_id: personId,
           follower_login: follower.login,
@@ -255,7 +268,19 @@ Deno.serve(async () => {
       })
       .not("github_username", "is", null);
 
-    return json({ ok: true, repoEvents, followerEvents, skippedUsers });
+    return json({
+      ok: true,
+      repoEvents,
+      followerEvents,
+      skippedUsers,
+      syncedUsers: syncTargets.length,
+      limits: {
+        maxUsersPerSync,
+        maxReposPerUser,
+        maxFollowersPerUser,
+        maxImportanceChecksPerUser,
+      },
+    });
   } catch (error) {
     console.error(error);
     return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
