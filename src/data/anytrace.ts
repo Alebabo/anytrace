@@ -174,6 +174,7 @@ export interface GraphData {
   weeklyPicks: WeeklyPick[];
   edges: GraphEdge[];
   hasSelectedVcs: boolean;
+  viewMode: "selected" | "all";
   graphSource: "direct" | "fallback" | "empty";
   orphanedEventCount: number;
 }

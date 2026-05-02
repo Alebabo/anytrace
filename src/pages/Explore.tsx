@@ -196,7 +196,8 @@ function buildGraphLayout({
 function GraphInner() {
   const navigate = useNavigate();
   const { access } = useAccessState();
-  const graphQuery = useGraphData(access.isAuthenticated);
+  const [viewMode, setViewMode] = useState<"selected" | "all">("selected");
+  const graphQuery = useGraphData(access.isAuthenticated, viewMode);
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const [query, setQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
@@ -354,6 +355,7 @@ function GraphInner() {
   }, [graph, identities, positionOverrides, query, selectedNodeId, showOnlyTop]);
 
   const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
+  const requiresSelection = viewMode === "selected";
   const hasEdges = (graph?.edges.length ?? 0) > 0;
   const showingFallback = graph?.graphSource === "fallback";
   const graphIsPartial = showingFallback || (graph?.orphanedEventCount ?? 0) > 0;
@@ -384,9 +386,29 @@ function GraphInner() {
               <Flame className="h-3.5 w-3.5" />
               Top picks
             </Button>
+            <Button
+              variant={viewMode === "selected" ? "default" : "outline"}
+              size="sm"
+              className="rounded-full"
+              onClick={() => setViewMode("selected")}
+            >
+              Selected VCs
+            </Button>
+            <Button
+              variant={viewMode === "all" ? "default" : "outline"}
+              size="sm"
+              className="rounded-full"
+              onClick={() => setViewMode("all")}
+            >
+              All VCs
+            </Button>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
-              {showingFallback ? "Fallback signal view" : "Selected VCs only"}
+              {showingFallback
+                ? "Fallback signal view"
+                : viewMode === "all"
+                  ? "All VC sources"
+                  : "Selected VCs only"}
             </div>
           </div>
         </div>
@@ -400,7 +422,7 @@ function GraphInner() {
             title="Could not load the graph"
             body="The graph data could not be loaded from Supabase right now."
           />
-        ) : !hasSelectedVcs ? (
+        ) : requiresSelection && !hasSelectedVcs ? (
           <EmptyGraphState
             title="No VCs selected yet"
             body="Add a few venture accounts in Watchlist first. The graph only renders edges from your personal VC selection."
@@ -440,11 +462,15 @@ function GraphInner() {
           </ReactFlow>
         )}
 
-        {!graphQuery.isLoading && hasSelectedVcs && (
+        {!graphQuery.isLoading && (!requiresSelection || hasSelectedVcs) && (
           <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-10 space-y-2">
             <div className="rounded-full border border-border bg-background px-4 py-2 shadow-sm text-xs">
               <div className="flex items-center gap-3">
-                <span>{graph?.vcs.length ?? 0} selected VCs</span>
+                <span>
+                  {graph?.vcs.length ?? 0} {viewMode === "all" ? "visible VCs" : "selected VCs"}
+                </span>
+                <span>/</span>
+                <span>{viewMode === "all" ? "all mode" : "selected mode"}</span>
                 <span>/</span>
                 <span>{graph?.people.length ?? 0} connected people</span>
                 <span>/</span>

@@ -758,7 +758,7 @@ export function useWatchlist(enabled = true) {
   };
 }
 
-export function useGraphData(enabled = true) {
+export function useGraphData(enabled = true, viewMode: "selected" | "all" = "selected") {
   const picksQuery = useWeeklyPicks(enabled);
   const selectedVcsQuery = useSelectedVcWatchlist(enabled);
   const vcSourcesQuery = useVcSources(enabled);
@@ -773,7 +773,8 @@ export function useGraphData(enabled = true) {
 
       const selectedVcs = selectedVcsQuery.data.map((item) => item.vcSource);
       const allVcs = vcSourcesQuery.data;
-      const selectedVcIds = new Set(selectedVcs.map((vc) => vc.id));
+      const scopedVcs = viewMode === "all" ? allVcs : selectedVcs;
+      const selectedVcIds = new Set(scopedVcs.map((vc) => vc.id));
       const validVcIds = new Set(allVcs.map((vc) => vc.id));
       const topPickIds = new Set((picksQuery.data ?? []).map((pick) => pick.person.id));
       const edgeMap = new Map<string, GraphEdge>();
@@ -815,10 +816,10 @@ export function useGraphData(enabled = true) {
       const connectedVcIds = new Set(Array.from(edgeMap.values()).map((edge) => edge.sourceId));
       const visibleVcs =
         directEvents.length > 0
-          ? selectedVcs
+          ? scopedVcs
           : allVcs.filter((vc) => connectedVcIds.has(vc.id)).length > 0
             ? allVcs.filter((vc) => connectedVcIds.has(vc.id))
-            : selectedVcs;
+            : scopedVcs;
       const people = peopleQuery.data.filter(
         (person) => connectedPeopleIds.has(person.id) || topPickIds.has(person.id),
       );
@@ -830,10 +831,11 @@ export function useGraphData(enabled = true) {
         weeklyPicks: picksQuery.data ?? [],
         edges: Array.from(edgeMap.values()),
         hasSelectedVcs: selectedVcs.length > 0,
+        viewMode,
         graphSource,
         orphanedEventCount,
       };
-    }, [eventsQuery.data, peopleQuery.data, picksQuery.data, selectedVcsQuery.data, vcSourcesQuery.data]),
+    }, [eventsQuery.data, peopleQuery.data, picksQuery.data, selectedVcsQuery.data, vcSourcesQuery.data, viewMode]),
     isLoading:
       picksQuery.isLoading ||
       selectedVcsQuery.isLoading ||
