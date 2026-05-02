@@ -41,9 +41,9 @@ function getVcSizeBucket(sizeLabel?: string | null) {
 function getVcNodeSize(sizeLabel?: string | null) {
   const bucket = getVcSizeBucket(sizeLabel);
 
-  if (bucket === "large") return 64;
-  if (bucket === "small") return 40;
-  return 52;
+  if (bucket === "large") return 78;
+  if (bucket === "small") return 34;
+  return 56;
 }
 
 function identityFor(
@@ -187,8 +187,8 @@ function buildGraphLayout({
             )
           : (index / Math.max(corePeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
       const innerRadius = topPickIds.has(person.id)
-        ? Math.max(88, vcRadius * 0.33 + (index % 2) * 22)
-        : Math.max(128, vcRadius * 0.47 + (index % 2) * 24);
+        ? Math.max(86, vcRadius * 0.31 + (index % 2) * 20)
+        : Math.max(136, vcRadius * 0.48 + (index % 2) * 26);
       const angleOffset = ((index % 3) - 1) * 0.24;
       positions.set(person.id, {
         x: Math.cos(baseAngle + angleOffset) * innerRadius,
@@ -219,7 +219,7 @@ function buildGraphLayout({
       .forEach((person, index) => {
         const centeredIndex = index - (sourcePeople.length - 1) / 2;
         const angleOffset = centeredIndex * 0.2;
-        const outerRadius = vcRadius + 180 + Math.abs(centeredIndex) * 18;
+        const outerRadius = vcRadius + 205 + Math.abs(centeredIndex) * 24;
         positions.set(person.id, {
           x: Math.cos(baseAngle + angleOffset) * outerRadius,
           y: Math.sin(baseAngle + angleOffset) * outerRadius,
@@ -231,7 +231,7 @@ function buildGraphLayout({
     .sort((left, right) => left.fullName.localeCompare(right.fullName))
     .forEach((person, index) => {
       const baseAngle = (index / Math.max(zeroConnectionPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      const outerRadius = vcRadius + 265 + Math.floor(index / Math.max(vcCount, 1)) * 90;
+      const outerRadius = vcRadius + 290 + Math.floor(index / Math.max(vcCount, 1)) * 96;
       const angleOffset = ((index % 4) - 1.5) * 0.18;
       positions.set(person.id, {
         x: Math.cos(baseAngle + angleOffset) * outerRadius,
@@ -505,7 +505,7 @@ function GraphInner() {
             nodesConnectable={false}
             nodesDraggable
             onNodeClick={(_, node) => {
-              setSelectedNodeId(node.id);
+              setSelectedNodeId((current) => (current === node.id ? null : node.id));
             }}
             onNodeDragStop={(_, node) => {
               setPositionOverrides((current) => ({
