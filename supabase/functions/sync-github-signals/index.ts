@@ -26,6 +26,16 @@ type GithubUser = {
   public_repos: number;
 };
 
+class GithubApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "GithubApiError";
+    this.status = status;
+  }
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -42,7 +52,7 @@ async function ghFetch<T>(path: string) {
     },
   });
   if (!response.ok) {
-    throw new Error(`GitHub API ${path} failed with ${response.status}`);
+    throw new GithubApiError(`GitHub API ${path} failed with ${response.status}`, response.status);
   }
   return (await response.json()) as T;
 }
@@ -92,15 +102,30 @@ Deno.serve(async () => {
 
     let repoEvents = 0;
     let followerEvents = 0;
+    const skippedUsers: Array<{ username: string; reason: string }> = [];
 
     for (const identity of identities ?? []) {
       const username = identity.handle;
       const personId = identity.person_id;
 
-      const [repos, followers] = await Promise.all([
-        fetchRepos(username),
-        fetchAllFollowers(username),
-      ]);
+      let repos: GithubRepo[] = [];
+      let followers: GithubFollower[] = [];
+
+      try {
+        [repos, followers] = await Promise.all([
+          fetchRepos(username),
+          fetchAllFollowers(username),
+        ]);
+      } catch (error) {
+        if (error instanceof GithubApiError && error.status === 404) {
+          skippedUsers.push({
+            username,
+            reason: "GitHub profile not found",
+          });
+          continue;
+        }
+        throw error;
+      }
 
       const { data: existingRepoObs } = await supabase
         .from("github_repo_observations")
@@ -230,7 +255,7 @@ Deno.serve(async () => {
       })
       .not("github_username", "is", null);
 
-    return json({ ok: true, repoEvents, followerEvents });
+    return json({ ok: true, repoEvents, followerEvents, skippedUsers });
   } catch (error) {
     console.error(error);
     return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
