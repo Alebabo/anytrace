@@ -422,10 +422,34 @@ export function useSelectedVcWatchlist(enabled = true) {
         supabase.from("vc_sources").select("*"),
       ]);
 
-      if (itemsError) throw itemsError;
       if (vcsError) throw vcsError;
 
-      const vcMap = new Map((vcs ?? []).map((row) => [row.id, mapVc(row)]));
+      const mappedVcs = (vcs ?? []).map(mapVc);
+      const vcMap = new Map(mappedVcs.map((row) => [row.id, row]));
+
+      if (itemsError) {
+        return mappedVcs
+          .filter((vc) => vc.isSeeded)
+          .map<UserVcWatchlistItem>((vc, index) => ({
+            id: `fallback-watch-${vc.id}`,
+            userId: session!.user.id,
+            vcSourceId: vc.id,
+            createdAt: new Date(Date.now() + index * 1000).toISOString(),
+            vcSource: vc,
+          }));
+      }
+
+      if ((items ?? []).length === 0) {
+        return mappedVcs
+          .filter((vc) => vc.isSeeded)
+          .map<UserVcWatchlistItem>((vc, index) => ({
+            id: `fallback-watch-${vc.id}`,
+            userId: session!.user.id,
+            vcSourceId: vc.id,
+            createdAt: new Date(Date.now() + index * 1000).toISOString(),
+            vcSource: vc,
+          }));
+      }
 
       return (items ?? [])
         .map<UserVcWatchlistItem | null>((item: WatchlistRow) => {
@@ -736,23 +760,30 @@ export function useWatchlist(enabled = true) {
 export function useGraphData(enabled = true) {
   const picksQuery = useWeeklyPicks(enabled);
   const selectedVcsQuery = useSelectedVcWatchlist(enabled);
+  const vcSourcesQuery = useVcSources(enabled);
   const peopleQuery = useTrackedPeople(enabled);
   const eventsQuery = useActivityEvents(enabled);
 
   return {
     data: useMemo(() => {
-      if (!selectedVcsQuery.data || !peopleQuery.data || !eventsQuery.data) {
+      if (!selectedVcsQuery.data || !vcSourcesQuery.data || !peopleQuery.data || !eventsQuery.data) {
         return null;
       }
 
       const selectedVcs = selectedVcsQuery.data.map((item) => item.vcSource);
+      const allVcs = vcSourcesQuery.data;
       const selectedVcIds = new Set(selectedVcs.map((vc) => vc.id));
       const topPickIds = new Set((picksQuery.data ?? []).map((pick) => pick.person.id));
       const edgeMap = new Map<string, GraphEdge>();
-
-      for (const event of eventsQuery.data.filter(
+      const directEvents = eventsQuery.data.filter(
         (item) => item.vcSourceId && selectedVcIds.has(item.vcSourceId),
-      )) {
+      );
+      const fallbackEvents =
+        directEvents.length > 0
+          ? directEvents
+          : eventsQuery.data.filter((item) => item.vcSourceId && item.eventType === "vc_follow");
+
+      for (const event of fallbackEvents) {
         const key = `${event.vcSourceId}-${event.personId}-${event.platform}`;
         const existing = edgeMap.get(key);
         if (existing) {
@@ -770,32 +801,42 @@ export function useGraphData(enabled = true) {
       }
 
       const connectedPeopleIds = new Set(Array.from(edgeMap.values()).map((edge) => edge.targetId));
+      const connectedVcIds = new Set(Array.from(edgeMap.values()).map((edge) => edge.sourceId));
+      const visibleVcs =
+        directEvents.length > 0
+          ? selectedVcs
+          : allVcs.filter((vc) => connectedVcIds.has(vc.id)).length > 0
+            ? allVcs.filter((vc) => connectedVcIds.has(vc.id))
+            : selectedVcs;
       const people = peopleQuery.data.filter(
         (person) => connectedPeopleIds.has(person.id) || topPickIds.has(person.id),
       );
 
       return {
-        vcs: selectedVcs,
+        vcs: visibleVcs,
         people,
         events: eventsQuery.data,
         weeklyPicks: picksQuery.data ?? [],
         edges: Array.from(edgeMap.values()),
         hasSelectedVcs: selectedVcs.length > 0,
       };
-    }, [eventsQuery.data, peopleQuery.data, picksQuery.data, selectedVcsQuery.data]),
+    }, [eventsQuery.data, peopleQuery.data, picksQuery.data, selectedVcsQuery.data, vcSourcesQuery.data]),
     isLoading:
       picksQuery.isLoading ||
       selectedVcsQuery.isLoading ||
+      vcSourcesQuery.isLoading ||
       peopleQuery.isLoading ||
       eventsQuery.isLoading,
     isError:
       picksQuery.isError ||
       selectedVcsQuery.isError ||
+      vcSourcesQuery.isError ||
       peopleQuery.isError ||
       eventsQuery.isError,
     error:
       picksQuery.error ??
       selectedVcsQuery.error ??
+      vcSourcesQuery.error ??
       peopleQuery.error ??
       eventsQuery.error,
   };

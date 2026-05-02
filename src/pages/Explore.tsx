@@ -13,7 +13,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Filter, Flame, Search } from "lucide-react";
+import { ExternalLink, Filter, Flame, Search } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ function VcNode({ data }: NodeProps<Node<GraphNodeData>>) {
   if (data.kind !== "vc") return null;
   return (
     <div
-      className={`rounded-full bg-background ring-1 ring-border p-1 transition-all ${
+      className={`cursor-pointer rounded-full bg-background ring-1 ring-border p-1 transition-all ${
         data.highlight ? "ring-2 ring-accent-indigo shadow-md scale-110" : ""
       } ${data.dim ? "opacity-30" : ""}`}
     >
@@ -51,7 +51,7 @@ function PersonNode({ data }: NodeProps<Node<GraphNodeData>>) {
   if (data.kind !== "person") return null;
   return (
     <div
-      className={`relative rounded-2xl transition-all ${
+      className={`relative cursor-pointer rounded-2xl transition-all ${
         data.topPick ? "ring-4 ring-destructive/30 shadow-lg" : "ring-1 ring-border"
       } ${data.highlight ? "scale-110" : ""} ${data.dim ? "opacity-30" : ""}`}
     >
@@ -105,9 +105,24 @@ function GraphInner() {
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const [query, setQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const graph = graphQuery.data;
   const identities = identitiesQuery.data ?? [];
+  const selectedPerson = graph?.people.find((person) => person.id === selectedNodeId) ?? null;
+  const selectedVc = graph?.vcs.find((vc) => vc.id === selectedNodeId) ?? null;
+  const selectedPersonIdentities = selectedPerson
+    ? identities.filter((identity) => identity.personId === selectedPerson.id)
+    : [];
+  const selectedPersonEvents = selectedPerson
+    ? (graph?.events ?? []).filter((event) => event.personId === selectedPerson.id).slice(0, 4)
+    : [];
+  const selectedVcConnections = selectedVc
+    ? (graph?.edges ?? [])
+        .filter((edge) => edge.sourceId === selectedVc.id)
+        .map((edge) => graph?.people.find((person) => person.id === edge.targetId))
+        .filter((person): person is TrackedPerson => !!person)
+    : [];
 
   const built = useMemo(() => {
     if (!graph) return { nodes: [] as Node<GraphNodeData>[], edges: [] as Edge[] };
@@ -244,9 +259,7 @@ function GraphInner() {
             proOptions={{ hideAttribution: true }}
             nodesConnectable={false}
             onNodeClick={(_, node) => {
-              if (node.id && graph?.people.some((person) => person.id === node.id)) {
-                navigate(`/connections/${node.id}`);
-              }
+              setSelectedNodeId(node.id);
             }}
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--border))" />
@@ -266,6 +279,98 @@ function GraphInner() {
               <span>/</span>
               <span>{graph?.edges.length ?? 0} active edges</span>
             </div>
+          </div>
+        )}
+
+        {!graphQuery.isLoading && (selectedPerson || selectedVc) && (
+          <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-10 w-[340px] max-w-[calc(100vw-1.5rem)] rounded-[28px] border border-border bg-background p-5 shadow-xl">
+            {selectedPerson && (
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <EntityAvatar
+                      name={selectedPerson.fullName}
+                      githubUsername={identityFor(identities, selectedPerson.id, "github")?.handle}
+                      size={44}
+                      rounded="xl"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{selectedPerson.fullName}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {selectedPerson.roleTitle}
+                        {selectedPerson.company ? ` / ${selectedPerson.company}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedNodeId(null)}>
+                    Close
+                  </Button>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{selectedPerson.summary}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  {selectedPersonIdentities.map((identity) => (
+                    <a key={identity.id} href={identity.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
+                      {identity.platform}
+                    </a>
+                  ))}
+                </div>
+                <div className="mt-4 space-y-2">
+                  {selectedPersonEvents.map((event) => (
+                    <div key={event.id} className="rounded-2xl bg-surface-sunken px-3 py-2">
+                      <div className="text-xs font-medium">{event.headline}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">{event.eventType}</div>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 rounded-full gap-1.5"
+                  onClick={() => navigate(`/connections/${selectedPerson.id}`)}
+                >
+                  Open full profile <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+
+            {selectedVc && !selectedPerson && (
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{selectedVc.name}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {selectedVc.country}
+                      {selectedVc.sizeLabel ? ` / ${selectedVc.sizeLabel}` : ""}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedNodeId(null)}>
+                    Close
+                  </Button>
+                </div>
+                {selectedVc.sectorFocus && (
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{selectedVc.sectorFocus}</p>
+                )}
+                <div className="mt-4 text-xs text-muted-foreground">
+                  {selectedVcConnections.length} connected people
+                </div>
+                <div className="mt-3 space-y-2">
+                  {selectedVcConnections.slice(0, 4).map((person) => (
+                    <button
+                      key={person.id}
+                      type="button"
+                      className="flex w-full items-center gap-3 rounded-2xl bg-surface-sunken px-3 py-2 text-left hover:bg-surface-sunken/80"
+                      onClick={() => setSelectedNodeId(person.id)}
+                    >
+                      <EntityAvatar name={person.fullName} size={34} rounded="xl" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium truncate">{person.fullName}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{person.company || person.roleTitle}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
