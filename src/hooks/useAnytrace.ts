@@ -35,8 +35,8 @@ type EventRow = Database["public"]["Tables"]["activity_events"]["Row"];
 
 const DEMO_MODE_KEY = "anytrace-demo-mode";
 const DEMO_MODE_EVENT = "anytrace-demo-mode-change";
-const DEMO_VC_CATALOG_KEY = "anytrace-demo-vc-catalog";
-const DEMO_VC_SELECTED_IDS_KEY = "anytrace-demo-selected-vc-ids";
+const DEMO_VC_CATALOG_KEY = "anytrace-demo-vc-catalog-v2";
+const DEMO_VC_SELECTED_IDS_KEY = "anytrace-demo-selected-vc-ids-v2";
 
 function readDemoMode() {
   if (typeof window === "undefined") return false;
@@ -63,6 +63,35 @@ function slugifyVc(name: string, firm: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeTwitterInput(input: string) {
+  const trimmed = input.trim();
+  const withoutAt = trimmed.replace(/^@/, "");
+  if (!trimmed) {
+    return { handle: "", url: "" };
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      const handle = parsed.pathname.split("/").filter(Boolean).at(-1)?.replace(/^@/, "") ?? "";
+      return {
+        handle: handle.toLowerCase(),
+        url: `https://twitter.com/${handle}`,
+      };
+    } catch {
+      return { handle: withoutAt.toLowerCase(), url: `https://twitter.com/${withoutAt}` };
+    }
+  }
+  return {
+    handle: withoutAt.toLowerCase(),
+    url: `https://twitter.com/${withoutAt}`,
+  };
+}
+
+function inferTier(sizeLabel: string | undefined): "vc" | "microvc" {
+  if (!sizeLabel) return "vc";
+  return sizeLabel.toLowerCase().includes("klein") ? "microvc" : "vc";
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -107,11 +136,14 @@ function mapVc(row: VcRow): VcSource {
     name: row.name,
     title: row.title,
     firm: row.firm,
+    sizeLabel: row.size_label ?? row.title,
+    sectorFocus: row.sector_focus ?? row.firm,
     tier: row.tier,
     region: row.region,
     country: row.country,
     city: row.city,
     xHandle: row.x_handle,
+    twitterUrl: row.twitter_url ?? (row.x_handle ? `https://twitter.com/${row.x_handle}` : null),
     xUserId: row.x_user_id,
     linkedinUrl: row.linkedin_url,
     githubUsername: row.github_username,
@@ -418,14 +450,19 @@ export function useAddVcToWatchlist() {
 
   return useMutation({
     mutationFn: async (draft: VcSourceDraft) => {
-      const slug = slugifyVc(draft.name, draft.firm);
+      const slug = slugifyVc(draft.name, draft.country);
+      const normalizedTwitter = normalizeTwitterInput(draft.twitterUrl);
+      const sizeLabel = draft.sizeLabel.trim();
+      const sectorFocus = draft.sectorFocus.trim();
+      if (!normalizedTwitter.handle) {
+        throw new Error("Please provide a valid Twitter URL or handle.");
+      }
 
       if (demoMode) {
         const catalog = readDemoVcCatalog();
         const selectedIds = new Set(readDemoSelectedVcIds());
-        const normalizedHandle = draft.xHandle.replace(/^@/, "").trim().toLowerCase();
         const existing =
-          catalog.find((vc) => vc.xHandle?.toLowerCase() === normalizedHandle) ??
+          catalog.find((vc) => vc.xHandle?.toLowerCase() === normalizedTwitter.handle) ??
           catalog.find((vc) => vc.slug === slug);
 
         const vc: VcSource =
@@ -434,18 +471,21 @@ export function useAddVcToWatchlist() {
             id: `demo-vc-${crypto.randomUUID()}`,
             slug: existing?.slug ?? slug,
             name: draft.name.trim(),
-            title: draft.title?.trim() || "Partner",
-            firm: draft.firm.trim(),
-            tier: draft.tier ?? "vc",
+            title: sizeLabel,
+            firm: sectorFocus,
+            sizeLabel,
+            sectorFocus,
+            tier: draft.tier ?? inferTier(sizeLabel),
             region: draft.region?.trim() || "Europe",
-            country: draft.country?.trim() || "Unknown",
+            country: draft.country.trim(),
             city: draft.city?.trim() || "",
-            xHandle: normalizedHandle,
+            xHandle: normalizedTwitter.handle,
+            twitterUrl: normalizedTwitter.url,
             xUserId: null,
-            linkedinUrl: draft.linkedinUrl?.trim() || null,
+            linkedinUrl: draft.linkedinUrl.trim(),
             githubUsername: draft.githubUsername?.trim() || null,
             websiteUrl: draft.websiteUrl?.trim() || null,
-            notes: draft.notes?.trim() || "",
+            notes: draft.notes?.trim() || sectorFocus,
             isSeeded: false,
             createdByUserId: "demo-user",
             syncStatus: "idle",
@@ -466,12 +506,10 @@ export function useAddVcToWatchlist() {
         throw new Error("You need to be signed in to manage VCs.");
       }
 
-      const normalizedHandle = draft.xHandle.replace(/^@/, "").trim().toLowerCase();
-
       const { data: existingByHandle, error: existingError } = await supabase
         .from("vc_sources")
         .select("*")
-        .eq("x_handle", normalizedHandle)
+        .eq("x_handle", normalizedTwitter.handle)
         .maybeSingle();
 
       if (existingError) throw existingError;
@@ -484,17 +522,20 @@ export function useAddVcToWatchlist() {
           .insert({
             slug,
             name: draft.name.trim(),
-            title: draft.title?.trim() || "Partner",
-            firm: draft.firm.trim(),
-            tier: draft.tier ?? "vc",
+            title: sizeLabel,
+            firm: sectorFocus,
+            size_label: sizeLabel,
+            sector_focus: sectorFocus,
+            tier: draft.tier ?? inferTier(sizeLabel),
             region: draft.region?.trim() || "Europe",
-            country: draft.country?.trim() || "Unknown",
+            country: draft.country.trim(),
             city: draft.city?.trim() || "",
-            x_handle: normalizedHandle,
-            linkedin_url: draft.linkedinUrl?.trim() || null,
+            x_handle: normalizedTwitter.handle,
+            twitter_url: normalizedTwitter.url,
+            linkedin_url: draft.linkedinUrl.trim(),
             github_username: draft.githubUsername?.trim() || null,
             website_url: draft.websiteUrl?.trim() || null,
-            notes: draft.notes?.trim() || "",
+            notes: draft.notes?.trim() || sectorFocus,
             is_seeded: false,
             created_by_user_id: session.user.id,
             sync_status: "idle",

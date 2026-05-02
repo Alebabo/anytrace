@@ -42,11 +42,24 @@ function SelectedVcRow({
       <div className="min-w-0">
         <div className="text-sm font-medium truncate">{vcSource.name}</div>
         <div className="text-xs text-muted-foreground mt-1 truncate">
-          {vcSource.title} / {vcSource.firm}
-          {vcSource.xHandle ? ` / @${vcSource.xHandle}` : ""}
+          {vcSource.country}
+          {vcSource.sizeLabel ? ` / ${vcSource.sizeLabel}` : ""}
+          {vcSource.sectorFocus ? ` / ${vcSource.sectorFocus}` : ""}
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {vcSource.twitterUrl && (
+            <a href={vcSource.twitterUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
+              <Twitter className="h-4 w-4" />
+            </a>
+          )}
+          {vcSource.linkedinUrl && (
+            <a href={vcSource.linkedinUrl} target="_blank" rel="noreferrer" className="hover:text-signal-linkedin">
+              <Linkedin className="h-4 w-4" />
+            </a>
+          )}
+        </div>
         <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
           {vcSource.syncStatus ?? "idle"}
         </span>
@@ -116,13 +129,12 @@ function WatchlistRow({ person }: { person: WatchlistPerson }) {
 
 const emptyDraft: VcSourceDraft = {
   name: "",
-  firm: "",
-  xHandle: "",
-  title: "",
   country: "",
-  city: "",
-  githubUsername: "",
+  sizeLabel: "",
+  sectorFocus: "",
+  twitterUrl: "",
   linkedinUrl: "",
+  githubUsername: "",
   websiteUrl: "",
   notes: "",
 };
@@ -139,7 +151,16 @@ export default function WatchlistPage() {
   const people = watchlist?.people ?? [];
 
   const submitDraft = async () => {
-    if (!draft.name.trim() || !draft.firm.trim() || !draft.xHandle.trim()) return;
+    if (
+      !draft.name.trim() ||
+      !draft.country.trim() ||
+      !draft.sizeLabel.trim() ||
+      !draft.sectorFocus.trim() ||
+      !draft.twitterUrl.trim() ||
+      !draft.linkedinUrl.trim()
+    ) {
+      return;
+    }
     await addVc.mutateAsync(draft);
     setDraft(emptyDraft);
   };
@@ -178,51 +199,54 @@ export default function WatchlistPage() {
             <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm mb-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <Input
-                  placeholder="VC name"
+                  placeholder="Name"
                   value={draft.name}
                   onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                 />
                 <Input
-                  placeholder="Firm"
-                  value={draft.firm}
-                  onChange={(event) => setDraft((current) => ({ ...current, firm: event.target.value }))}
+                  placeholder="Land"
+                  value={draft.country}
+                  onChange={(event) => setDraft((current) => ({ ...current, country: event.target.value }))}
                 />
                 <Input
-                  placeholder="X handle"
-                  value={draft.xHandle}
-                  onChange={(event) => setDraft((current) => ({ ...current, xHandle: event.target.value }))}
+                  placeholder="Groesse"
+                  value={draft.sizeLabel}
+                  onChange={(event) => setDraft((current) => ({ ...current, sizeLabel: event.target.value }))}
                 />
                 <Input
-                  placeholder="Title (optional)"
-                  value={draft.title}
-                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                  placeholder="Branche"
+                  value={draft.sectorFocus}
+                  onChange={(event) => setDraft((current) => ({ ...current, sectorFocus: event.target.value }))}
+                />
+                <Input
+                  placeholder="Twitter URL"
+                  value={draft.twitterUrl}
+                  onChange={(event) => setDraft((current) => ({ ...current, twitterUrl: event.target.value }))}
+                />
+                <Input
+                  placeholder="LinkedIn URL"
+                  value={draft.linkedinUrl}
+                  onChange={(event) => setDraft((current) => ({ ...current, linkedinUrl: event.target.value }))}
                 />
                 <Input
                   placeholder="GitHub username (optional)"
                   value={draft.githubUsername}
                   onChange={(event) => setDraft((current) => ({ ...current, githubUsername: event.target.value }))}
                 />
-                <Input
-                  placeholder="LinkedIn URL (optional)"
-                  value={draft.linkedinUrl}
-                  onChange={(event) => setDraft((current) => ({ ...current, linkedinUrl: event.target.value }))}
-                />
-                <Input
-                  placeholder="Website URL (optional)"
-                  value={draft.websiteUrl}
-                  onChange={(event) => setDraft((current) => ({ ...current, websiteUrl: event.target.value }))}
-                />
-                <Input
-                  placeholder="Country (optional)"
-                  value={draft.country}
-                  onChange={(event) => setDraft((current) => ({ ...current, country: event.target.value }))}
-                />
               </div>
               <div className="mt-4 flex justify-end">
                 <Button
                   className="rounded-full gap-2"
                   onClick={submitDraft}
-                  disabled={addVc.isPending || !draft.name.trim() || !draft.firm.trim() || !draft.xHandle.trim()}
+                  disabled={
+                    addVc.isPending ||
+                    !draft.name.trim() ||
+                    !draft.country.trim() ||
+                    !draft.sizeLabel.trim() ||
+                    !draft.sectorFocus.trim() ||
+                    !draft.twitterUrl.trim() ||
+                    !draft.linkedinUrl.trim()
+                  }
                 >
                   {addVc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add VC

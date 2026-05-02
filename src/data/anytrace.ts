@@ -31,11 +31,14 @@ export interface VcSource {
   name: string;
   title: string;
   firm: string;
+  sizeLabel?: string;
+  sectorFocus?: string;
   tier: VcTier;
   region: string;
   country: string;
   city: string;
   xHandle?: string | null;
+  twitterUrl?: string | null;
   xUserId?: string | null;
   linkedinUrl?: string | null;
   githubUsername?: string | null;
@@ -59,14 +62,17 @@ export interface UserVcWatchlistItem {
 
 export interface VcSourceDraft {
   name: string;
+  country: string;
+  sizeLabel: string;
+  sectorFocus: string;
+  twitterUrl: string;
+  linkedinUrl: string;
   title?: string;
-  firm: string;
+  firm?: string;
   tier?: VcTier;
-  country?: string;
   city?: string;
   region?: string;
-  xHandle: string;
-  linkedinUrl?: string;
+  xHandle?: string;
   githubUsername?: string;
   websiteUrl?: string;
   notes?: string;
