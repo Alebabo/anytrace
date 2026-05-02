@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Background,
@@ -25,6 +25,8 @@ import type { ActivityPlatform, PersonIdentity, TrackedPerson, VcSource } from "
 type GraphNodeData =
   | { kind: "vc"; vc: VcSource; highlight: boolean; dim: boolean }
   | { kind: "person"; person: TrackedPerson; githubUsername?: string; highlight: boolean; dim: boolean; topPick: boolean };
+
+type GraphPosition = { x: number; y: number };
 
 function identityFor(
   identities: PersonIdentity[],
@@ -105,6 +107,109 @@ function EmptyGraphState({
   );
 }
 
+function buildGraphLayout({
+  vcs,
+  people,
+  edges,
+  topPickIds,
+}: {
+  vcs: VcSource[];
+  people: TrackedPerson[];
+  edges: { sourceId: string; targetId: string }[];
+  topPickIds: Set<string>;
+}) {
+  const positions = new Map<string, GraphPosition>();
+  const peopleById = new Map(people.map((person) => [person.id, person]));
+  const vcCount = Math.max(vcs.length, 1);
+  const vcSpacing = 220;
+  const vcRowWidth = (vcCount - 1) * vcSpacing;
+  const topY = -220;
+
+  vcs.forEach((vc, index) => {
+    positions.set(vc.id, {
+      x: index * vcSpacing - vcRowWidth / 2,
+      y: topY + Math.sin((index / vcCount) * Math.PI) * 40,
+    });
+  });
+
+  const incomingByPerson = new Map<string, string[]>();
+  for (const edge of edges) {
+    const list = incomingByPerson.get(edge.targetId) ?? [];
+    list.push(edge.sourceId);
+    incomingByPerson.set(edge.targetId, list);
+  }
+
+  const singleConnectionBuckets = new Map<string, TrackedPerson[]>();
+  const multiConnectionPeople: TrackedPerson[] = [];
+  const unconnectedPeople: TrackedPerson[] = [];
+
+  for (const person of people) {
+    const sources = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
+    if (sources.length === 1) {
+      const list = singleConnectionBuckets.get(sources[0]) ?? [];
+      list.push(person);
+      singleConnectionBuckets.set(sources[0], list);
+      continue;
+    }
+    if (sources.length > 1) {
+      multiConnectionPeople.push(person);
+      continue;
+    }
+    unconnectedPeople.push(person);
+  }
+
+  vcs.forEach((vc) => {
+    const vcPosition = positions.get(vc.id) ?? { x: 0, y: topY };
+    const bucket = (singleConnectionBuckets.get(vc.id) ?? []).sort((left, right) =>
+      left.fullName.localeCompare(right.fullName),
+    );
+    const totalWidth = (bucket.length - 1) * 120;
+
+    bucket.forEach((person, index) => {
+      positions.set(person.id, {
+        x: vcPosition.x + index * 120 - totalWidth / 2,
+        y: topPickIds.has(person.id) ? 40 : 110,
+      });
+    });
+  });
+
+  multiConnectionPeople
+    .sort((left, right) => left.fullName.localeCompare(right.fullName))
+    .forEach((person, index) => {
+      const sourceIds = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
+      const anchors = sourceIds
+        .map((sourceId) => positions.get(sourceId))
+        .filter((point): point is GraphPosition => !!point);
+
+      const centerX =
+        anchors.length > 0
+          ? anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length
+          : 0;
+      const spreadOffset = (index % 4) * 110 - 165;
+      positions.set(person.id, {
+        x: centerX + spreadOffset,
+        y: topPickIds.has(person.id) ? 240 : 310 + Math.floor(index / 4) * 110,
+      });
+    });
+
+  unconnectedPeople
+    .sort((left, right) => left.fullName.localeCompare(right.fullName))
+    .forEach((person, index) => {
+      positions.set(person.id, {
+        x: -240 + (index % 4) * 160,
+        y: 420 + Math.floor(index / 4) * 110,
+      });
+    });
+
+  for (const person of people) {
+    if (!positions.has(person.id)) {
+      positions.set(person.id, { x: 0, y: 360 });
+    }
+  }
+
+  return positions;
+}
+
 function GraphInner() {
   const navigate = useNavigate();
   const { access } = useAccessState();
@@ -113,6 +218,7 @@ function GraphInner() {
   const [query, setQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [positionOverrides, setPositionOverrides] = useState<Record<string, GraphPosition>>({});
 
   const graph = graphQuery.data;
   const identities = identitiesQuery.data ?? [];
@@ -131,6 +237,21 @@ function GraphInner() {
         .filter((person): person is TrackedPerson => !!person)
     : [];
 
+  useEffect(() => {
+    if (!graph) {
+      setPositionOverrides({});
+      return;
+    }
+
+    setPositionOverrides((current) => {
+      const validIds = new Set([...graph.vcs.map((vc) => vc.id), ...graph.people.map((person) => person.id)]);
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([nodeId]) => validIds.has(nodeId)),
+      );
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+  }, [graph]);
+
   const built = useMemo(() => {
     if (!graph) return { nodes: [] as Node<GraphNodeData>[], edges: [] as Edge[] };
 
@@ -147,14 +268,21 @@ function GraphInner() {
     const personIds = new Set(filteredPeople.map((person) => person.id));
     const filteredEdges = graph.edges.filter((edge) => personIds.has(edge.targetId));
     const vcIds = new Set(filteredEdges.map((edge) => edge.sourceId));
+    const visibleVcs = graph.vcs.filter((vc) => vcIds.has(vc.id) || !filteredEdges.length);
+    const layoutPositions = buildGraphLayout({
+      vcs: visibleVcs,
+      people: filteredPeople,
+      edges: filteredEdges,
+      topPickIds,
+    });
 
-    graph.vcs.forEach((vc, index) => {
-      const angle = (index / Math.max(graph.vcs.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      const radius = 180;
+    visibleVcs.forEach((vc) => {
+      const position = positionOverrides[vc.id] ?? layoutPositions.get(vc.id) ?? { x: 0, y: -220 };
       vcNodes.push({
         id: vc.id,
         type: "vc",
-        position: { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius },
+        position,
+        draggable: true,
         data: {
           kind: "vc",
           vc,
@@ -164,13 +292,16 @@ function GraphInner() {
       });
     });
 
-    filteredPeople.forEach((person, index) => {
-      const angle = (index / Math.max(filteredPeople.length, 1)) * Math.PI * 2 + Math.PI / 5;
-      const radius = topPickIds.has(person.id) ? 360 : 300;
+    filteredPeople.forEach((person) => {
+      const position =
+        positionOverrides[person.id] ??
+        layoutPositions.get(person.id) ??
+        { x: 0, y: topPickIds.has(person.id) ? 240 : 320 };
       personNodes.push({
         id: person.id,
         type: "person",
-        position: { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius },
+        position,
+        draggable: true,
         data: {
           kind: "person",
           person,
@@ -197,7 +328,7 @@ function GraphInner() {
     });
 
     return { nodes: [...vcNodes, ...personNodes], edges };
-  }, [graph, identities, query, showOnlyTop]);
+  }, [graph, identities, positionOverrides, query, showOnlyTop]);
 
   const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
   const hasEdges = (graph?.edges.length ?? 0) > 0;
@@ -267,8 +398,15 @@ function GraphInner() {
             maxZoom={1.8}
             proOptions={{ hideAttribution: true }}
             nodesConnectable={false}
+            nodesDraggable
             onNodeClick={(_, node) => {
               setSelectedNodeId(node.id);
+            }}
+            onNodeDragStop={(_, node) => {
+              setPositionOverrides((current) => ({
+                ...current,
+                [node.id]: node.position,
+              }));
             }}
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--border))" />
