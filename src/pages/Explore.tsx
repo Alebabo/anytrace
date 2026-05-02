@@ -119,16 +119,14 @@ function buildGraphLayout({
   topPickIds: Set<string>;
 }) {
   const positions = new Map<string, GraphPosition>();
-  const peopleById = new Map(people.map((person) => [person.id, person]));
   const vcCount = Math.max(vcs.length, 1);
-  const vcSpacing = 220;
-  const vcRowWidth = (vcCount - 1) * vcSpacing;
-  const topY = -220;
+  const vcRadius = Math.max(220, vcCount * 22);
 
   vcs.forEach((vc, index) => {
+    const angle = (index / vcCount) * Math.PI * 2 - Math.PI / 2;
     positions.set(vc.id, {
-      x: index * vcSpacing - vcRowWidth / 2,
-      y: topY + Math.sin((index / vcCount) * Math.PI) * 40,
+      x: Math.cos(angle) * vcRadius,
+      y: Math.sin(angle) * vcRadius,
     });
   });
 
@@ -139,65 +137,50 @@ function buildGraphLayout({
     incomingByPerson.set(edge.targetId, list);
   }
 
-  const singleConnectionBuckets = new Map<string, TrackedPerson[]>();
-  const multiConnectionPeople: TrackedPerson[] = [];
-  const unconnectedPeople: TrackedPerson[] = [];
+  const topPickPeople = people.filter((person) => topPickIds.has(person.id));
+  const outerPeople = people.filter((person) => !topPickIds.has(person.id));
 
-  for (const person of people) {
-    const sources = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
-    if (sources.length === 1) {
-      const list = singleConnectionBuckets.get(sources[0]) ?? [];
-      list.push(person);
-      singleConnectionBuckets.set(sources[0], list);
-      continue;
-    }
-    if (sources.length > 1) {
-      multiConnectionPeople.push(person);
-      continue;
-    }
-    unconnectedPeople.push(person);
-  }
-
-  vcs.forEach((vc) => {
-    const vcPosition = positions.get(vc.id) ?? { x: 0, y: topY };
-    const bucket = (singleConnectionBuckets.get(vc.id) ?? []).sort((left, right) =>
-      left.fullName.localeCompare(right.fullName),
-    );
-    const totalWidth = (bucket.length - 1) * 120;
-
-    bucket.forEach((person, index) => {
-      positions.set(person.id, {
-        x: vcPosition.x + index * 120 - totalWidth / 2,
-        y: topPickIds.has(person.id) ? 40 : 110,
-      });
-    });
-  });
-
-  multiConnectionPeople
+  topPickPeople
     .sort((left, right) => left.fullName.localeCompare(right.fullName))
     .forEach((person, index) => {
       const sourceIds = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
       const anchors = sourceIds
         .map((sourceId) => positions.get(sourceId))
         .filter((point): point is GraphPosition => !!point);
-
-      const centerX =
+      const baseAngle =
         anchors.length > 0
-          ? anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length
-          : 0;
-      const spreadOffset = (index % 4) * 110 - 165;
+          ? Math.atan2(
+              anchors.reduce((sum, point) => sum + point.y, 0) / anchors.length,
+              anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length,
+            )
+          : (index / Math.max(topPickPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const innerRadius = Math.max(70, vcRadius * 0.46 + (index % 2) * 26);
+      const angleOffset = ((index % 3) - 1) * 0.28;
       positions.set(person.id, {
-        x: centerX + spreadOffset,
-        y: topPickIds.has(person.id) ? 240 : 310 + Math.floor(index / 4) * 110,
+        x: Math.cos(baseAngle + angleOffset) * innerRadius,
+        y: Math.sin(baseAngle + angleOffset) * innerRadius,
       });
     });
 
-  unconnectedPeople
+  outerPeople
     .sort((left, right) => left.fullName.localeCompare(right.fullName))
     .forEach((person, index) => {
+      const sourceIds = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
+      const anchors = sourceIds
+        .map((sourceId) => positions.get(sourceId))
+        .filter((point): point is GraphPosition => !!point);
+      const baseAngle =
+        anchors.length > 0
+          ? Math.atan2(
+              anchors.reduce((sum, point) => sum + point.y, 0) / anchors.length,
+              anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length,
+            )
+          : (index / Math.max(outerPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const outerRadius = vcRadius + 165 + Math.floor(index / Math.max(vcCount, 1)) * 90;
+      const angleOffset = ((index % 4) - 1.5) * 0.18;
       positions.set(person.id, {
-        x: -240 + (index % 4) * 160,
-        y: 420 + Math.floor(index / 4) * 110,
+        x: Math.cos(baseAngle + angleOffset) * outerRadius,
+        y: Math.sin(baseAngle + angleOffset) * outerRadius,
       });
     });
 
