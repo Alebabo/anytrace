@@ -251,6 +251,7 @@ function GraphInner() {
     const personIds = new Set(filteredPeople.map((person) => person.id));
     const filteredEdges = graph.edges.filter((edge) => personIds.has(edge.targetId));
     const vcIds = new Set(filteredEdges.map((edge) => edge.sourceId));
+    const activeNodeId = selectedNodeId;
     const visibleVcs = graph.vcs.filter((vc) => vcIds.has(vc.id) || !filteredEdges.length);
     const siblingOrderByEdgeId = new Map<string, number>();
     const siblingCountBySource = new Map<string, number>();
@@ -325,6 +326,8 @@ function GraphInner() {
       const siblingCount = siblingCountBySource.get(edge.sourceId) ?? 1;
       const centeredIndex = siblingIndex - (siblingCount - 1) / 2;
       const isOuterConnection = !topPickIds.has(edge.targetId);
+      const isSelectedConnection = !!activeNodeId && (edge.sourceId === activeNodeId || edge.targetId === activeNodeId);
+      const dimUnselectedEdges = !!activeNodeId && !isSelectedConnection;
 
       edges.push({
         id: edge.id,
@@ -342,13 +345,13 @@ function GraphInner() {
         style: {
           stroke: platformColor(edge.platform),
           strokeWidth: Math.min(4, Math.max(1.25, edge.eventCount * 1.3)),
-          opacity: edge.isTopPick ? 0.92 : 0.5,
+          opacity: dimUnselectedEdges ? 0.12 : edge.isTopPick ? 0.95 : 0.56,
         },
       });
     });
 
     return { nodes: [...vcNodes, ...personNodes], edges };
-  }, [graph, identities, positionOverrides, query, showOnlyTop]);
+  }, [graph, identities, positionOverrides, query, selectedNodeId, showOnlyTop]);
 
   const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
   const hasEdges = (graph?.edges.length ?? 0) > 0;
