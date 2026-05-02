@@ -18,7 +18,7 @@ function InfoRow({ icon: Icon, label, value }: { icon: typeof Mail; label: strin
 }
 
 export default function SettingsPage() {
-  const { session, access, subscription } = useAccessState();
+  const { session, access, subscription, demoMode } = useAccessState();
   const signOut = useSignOut();
 
   if (!access.isAuthenticated) {
@@ -50,6 +50,7 @@ export default function SettingsPage() {
             <h3 className="text-base font-medium mb-4">Account</h3>
             <InfoRow icon={Mail} label="Email" value={session?.user.email ?? "Unknown"} />
             <InfoRow icon={Shield} label="Access state" value={access.status} />
+            <InfoRow icon={Shield} label="Mode" value={demoMode ? "Demo" : "Authenticated"} />
             <InfoRow
               icon={CalendarClock}
               label="Trial ends"
@@ -62,7 +63,7 @@ export default function SettingsPage() {
                 disabled={signOut.isPending}
                 onClick={() => signOut.mutate()}
               >
-                Sign out
+                {demoMode ? "Exit demo mode" : "Sign out"}
               </Button>
             </div>
           </Card>

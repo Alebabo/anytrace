@@ -3,6 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  demoActivityEvents,
+  demoPersonIdentities,
+  demoTrackedPeople,
+  demoVcSources,
+  demoWeeklyPicks,
+} from "@/data/demoAnytrace";
 import type {
   ActivityEvent,
   GraphEdge,
@@ -22,6 +29,24 @@ type IdentityRow = Database["public"]["Tables"]["person_identities"]["Row"];
 type EventRow = Database["public"]["Tables"]["activity_events"]["Row"];
 type SnapshotRow = Database["public"]["Tables"]["weekly_pick_snapshots"]["Row"];
 type ReasonRow = Database["public"]["Tables"]["weekly_pick_reasons"]["Row"];
+
+const DEMO_MODE_KEY = "anytrace-demo-mode";
+const DEMO_MODE_EVENT = "anytrace-demo-mode-change";
+
+function readDemoMode() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(DEMO_MODE_KEY) === "true";
+}
+
+function writeDemoMode(next: boolean) {
+  if (typeof window === "undefined") return;
+  if (next) {
+    window.localStorage.setItem(DEMO_MODE_KEY, "true");
+  } else {
+    window.localStorage.removeItem(DEMO_MODE_KEY);
+  }
+  window.dispatchEvent(new CustomEvent(DEMO_MODE_EVENT));
+}
 
 function mapVc(row: VcRow): VcSource {
   return {
@@ -166,12 +191,29 @@ export function useSession() {
   return { session, loading };
 }
 
+export function useDemoMode() {
+  const [demoMode, setDemoMode] = useState(readDemoMode);
+
+  useEffect(() => {
+    const sync = () => setDemoMode(readDemoMode());
+    window.addEventListener("storage", sync);
+    window.addEventListener(DEMO_MODE_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(DEMO_MODE_EVENT, sync);
+    };
+  }, []);
+
+  return demoMode;
+}
+
 export function useAccessState() {
+  const demoMode = useDemoMode();
   const { session, loading } = useSession();
 
   const subscriptionQuery = useQuery({
     queryKey: ["subscription", session?.user.id ?? "signed-out"],
-    enabled: !!session?.user.id,
+    enabled: !!session?.user.id && !demoMode,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
@@ -190,11 +232,31 @@ export function useAccessState() {
     [subscriptionQuery.data, session],
   );
 
+  if (demoMode) {
+    return {
+      session: {
+        user: { id: "demo-user", email: "demo@anytrace.local" },
+      } as Session,
+      loading: false,
+      access: {
+        isAuthenticated: true,
+        canAccessProduct: true,
+        requiresPayment: false,
+        status: "active",
+        trialEndsAt: null,
+        daysLeftInTrial: null,
+      } satisfies ViewerAccessState,
+      subscription: null,
+      demoMode: true,
+    };
+  }
+
   return {
     session,
     loading: loading || subscriptionQuery.isLoading,
     access,
     subscription: subscriptionQuery.data ?? null,
+    demoMode: false,
   };
 }
 
@@ -213,10 +275,19 @@ export function useMagicLinkSignIn() {
   });
 }
 
+export function useEnableDemoMode() {
+  return useMutation({
+    mutationFn: async () => {
+      writeDemoMode(true);
+    },
+  });
+}
+
 export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
+      writeDemoMode(false);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
@@ -227,11 +298,13 @@ export function useSignOut() {
 }
 
 export function useVcSources(enabled = true) {
+  const demoMode = useDemoMode();
   return useQuery({
-    queryKey: ["vc-sources"],
+    queryKey: ["vc-sources", demoMode ? "demo" : "live"],
     enabled,
     staleTime: 60_000,
     queryFn: async () => {
+      if (demoMode) return demoVcSources;
       const { data, error } = await supabase.from("vc_sources").select("*").order("name");
       if (error) throw error;
       return (data ?? []).map(mapVc);
@@ -240,11 +313,13 @@ export function useVcSources(enabled = true) {
 }
 
 export function useTrackedPeople(enabled = true) {
+  const demoMode = useDemoMode();
   return useQuery({
-    queryKey: ["tracked-people"],
+    queryKey: ["tracked-people", demoMode ? "demo" : "live"],
     enabled,
     staleTime: 60_000,
     queryFn: async () => {
+      if (demoMode) return demoTrackedPeople;
       const { data, error } = await supabase
         .from("tracked_people")
         .select("*")
@@ -257,11 +332,13 @@ export function useTrackedPeople(enabled = true) {
 }
 
 export function usePersonIdentities(enabled = true) {
+  const demoMode = useDemoMode();
   return useQuery({
-    queryKey: ["person-identities"],
+    queryKey: ["person-identities", demoMode ? "demo" : "live"],
     enabled,
     staleTime: 60_000,
     queryFn: async () => {
+      if (demoMode) return demoPersonIdentities;
       const { data, error } = await supabase
         .from("person_identities")
         .select("*")
@@ -273,11 +350,13 @@ export function usePersonIdentities(enabled = true) {
 }
 
 export function useActivityEvents(enabled = true) {
+  const demoMode = useDemoMode();
   return useQuery({
-    queryKey: ["activity-events"],
+    queryKey: ["activity-events", demoMode ? "demo" : "live"],
     enabled,
     staleTime: 30_000,
     queryFn: async () => {
+      if (demoMode) return demoActivityEvents;
       const { data, error } = await supabase
         .from("activity_events")
         .select("*")
@@ -289,17 +368,22 @@ export function useActivityEvents(enabled = true) {
 }
 
 export function useWeeklyPicks(enabled = true) {
+  const demoMode = useDemoMode();
   return useQuery({
-    queryKey: ["weekly-picks"],
+    queryKey: ["weekly-picks", demoMode ? "demo" : "live"],
     enabled,
     staleTime: 30_000,
     queryFn: async () => {
-      const [{ data: snapshots, error: snapshotsError }, { data: people, error: peopleError }, { data: reasons, error: reasonsError }] =
-        await Promise.all([
-          supabase.from("weekly_pick_snapshots").select("*").order("week_start", { ascending: false }).order("rank"),
-          supabase.from("tracked_people").select("*"),
-          supabase.from("weekly_pick_reasons").select("*").order("display_order"),
-        ]);
+      if (demoMode) return demoWeeklyPicks;
+      const [
+        { data: snapshots, error: snapshotsError },
+        { data: people, error: peopleError },
+        { data: reasons, error: reasonsError },
+      ] = await Promise.all([
+        supabase.from("weekly_pick_snapshots").select("*").order("week_start", { ascending: false }).order("rank"),
+        supabase.from("tracked_people").select("*"),
+        supabase.from("weekly_pick_reasons").select("*").order("display_order"),
+      ]);
 
       if (snapshotsError) throw snapshotsError;
       if (peopleError) throw peopleError;

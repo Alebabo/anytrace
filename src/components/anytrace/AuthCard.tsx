@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { Loader2, Mail, Shield, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Mail, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMagicLinkSignIn } from "@/hooks/useAnytrace";
+import { useEnableDemoMode, useMagicLinkSignIn } from "@/hooks/useAnytrace";
 import { toast } from "sonner";
 
 export function AuthCard() {
   const [email, setEmail] = useState("");
   const signIn = useMagicLinkSignIn();
+  const enableDemo = useEnableDemoMode();
 
   const handleSubmit = async () => {
     const trimmed = email.trim();
@@ -24,14 +25,21 @@ export function AuthCard() {
     }
   };
 
+  const handleDemoMode = async () => {
+    try {
+      await enableDemo.mutateAsync();
+      toast.success("Demo mode enabled. Magic link bypassed for now.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not enable demo mode.");
+    }
+  };
+
   return (
     <div className="rounded-[28px] border border-border bg-card shadow-sm p-6 md:p-8 max-w-xl">
       <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-indigo-soft text-foreground mb-5">
         <Sparkles className="h-5 w-5" />
       </div>
-      <h2 className="font-serif text-3xl leading-tight">
-        Anytrace for venture teams
-      </h2>
+      <h2 className="font-serif text-3xl leading-tight">Anytrace for venture teams</h2>
       <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
         Track emerging people across X and GitHub, surface weekly top picks, and keep the graph focused on who is quietly collecting investor attention.
       </p>
@@ -47,11 +55,7 @@ export function AuthCard() {
             className="h-11 pl-10 rounded-full"
           />
         </div>
-        <Button
-          onClick={handleSubmit}
-          disabled={signIn.isPending}
-          className="h-11 rounded-full"
-        >
+        <Button onClick={handleSubmit} disabled={signIn.isPending} className="h-11 rounded-full">
           {signIn.isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" /> Sending magic link
@@ -60,11 +64,22 @@ export function AuthCard() {
             "Sign in with magic link"
           )}
         </Button>
+        <Button variant="outline" onClick={handleDemoMode} disabled={enableDemo.isPending} className="h-11 rounded-full">
+          {enableDemo.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Opening demo
+            </>
+          ) : (
+            <>
+              Continue in demo mode <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </Button>
       </div>
 
       <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
         <Shield className="h-3.5 w-3.5" />
-        Trial access is created automatically on first login. Stripe billing gets connected next.
+        Trial access is created automatically on first login. Demo mode uses local seeded data and bypasses Supabase auth.
       </div>
     </div>
   );
