@@ -21,12 +21,15 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const twitterApiKey = Deno.env.get("TWITTERAPI_IO_KEY")!;
 const followingsPageSize = Math.min(
   200,
-  Math.max(20, Number(Deno.env.get("X_FOLLOWINGS_PAGE_SIZE") ?? "50")),
+  Math.max(20, Number(Deno.env.get("X_FOLLOWINGS_PAGE_SIZE") ?? "20")),
 );
-const maxPagesPerSync = Math.max(1, Number(Deno.env.get("X_MAX_FOLLOWING_PAGES_PER_SYNC") ?? "2"));
-const maxVcsPerSync = Math.max(1, Number(Deno.env.get("X_MAX_VCS_PER_SYNC") ?? "8"));
+const maxPagesPerSync = Math.max(1, Number(Deno.env.get("X_MAX_FOLLOWING_PAGES_PER_SYNC") ?? "1"));
+const maxVcsPerSync = Math.max(1, Number(Deno.env.get("X_MAX_VCS_PER_SYNC") ?? "2"));
+const minIntervalMs = Math.max(0, Number(Deno.env.get("TWITTERAPI_IO_MIN_INTERVAL_MS") ?? "5500"));
+const resolveUserIds = Deno.env.get("X_RESOLVE_USER_IDS") === "true";
 
 const supabase = createClient(supabaseUrl, serviceRoleKey);
+let lastTwitterRequestAt = 0;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -55,10 +58,16 @@ function toResolvedXUser(raw: TwitterApiUser | null | undefined): ResolvedXUser 
 }
 
 async function twitterApiFetch<T>(path: string, params: Record<string, string>) {
+  const elapsed = Date.now() - lastTwitterRequestAt;
+  if (elapsed < minIntervalMs) {
+    await new Promise((resolve) => setTimeout(resolve, minIntervalMs - elapsed));
+  }
+
   const query = new URLSearchParams(params);
   const response = await fetch(`https://api.twitterapi.io${path}?${query.toString()}`, {
     headers: { "x-api-key": twitterApiKey },
   });
+  lastTwitterRequestAt = Date.now();
 
   if (!response.ok) {
     const body = await response.text();
@@ -68,7 +77,7 @@ async function twitterApiFetch<T>(path: string, params: Record<string, string>) 
   return (await response.json()) as T;
 }
 
-async function ensureXUserId(handle: string) {
+async function resolveXUserId(handle: string) {
   const normalized = normalizeTwitterHandle(handle);
   const payload = await twitterApiFetch<{ data?: TwitterApiUser }>(
     "/twitter/user/info",
@@ -207,14 +216,16 @@ Deno.serve(async () => {
       }
 
       try {
-        const resolvedUser = vc.x_user_id
-          ? { id: vc.x_user_id, name: vc.name, username: handle }
-          : await ensureXUserId(handle);
+        let resolvedUserId = vc.x_user_id;
+        if (resolveUserIds && !resolvedUserId) {
+          const resolved = await resolveXUserId(handle);
+          resolvedUserId = resolved.id;
+        }
 
-        if (!vc.x_user_id || vc.x_user_id !== resolvedUser.id) {
+        if (resolvedUserId && vc.x_user_id !== resolvedUserId) {
           await supabase
             .from("vc_sources")
-            .update({ x_user_id: resolvedUser.id, sync_status: "pending", last_sync_error: null })
+            .update({ x_user_id: resolvedUserId, sync_status: "pending", last_sync_error: null })
             .eq("id", vc.id);
         }
 
@@ -280,7 +291,7 @@ Deno.serve(async () => {
         await supabase
           .from("vc_sources")
           .update({
-            x_user_id: resolvedUser.id,
+            x_user_id: resolvedUserId,
             sync_status: "ok",
             last_x_sync_at: new Date().toISOString(),
             last_sync_error: null,
@@ -309,6 +320,8 @@ Deno.serve(async () => {
         followingsPageSize,
         maxPagesPerSync,
         maxVcsPerSync,
+        minIntervalMs,
+        resolveUserIds,
       },
     });
   } catch (error) {
