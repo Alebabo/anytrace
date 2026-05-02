@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, useActivityEvents, usePersonIdentities, useVcSources, useWeeklyPicks } from "@/hooks/useAnytrace";
 import type { ActivityEvent, PersonIdentity, VcSource, WeeklyPick } from "@/data/anytrace";
+import { avatarSourcesForPerson } from "@/lib/avatarSources";
 
 function pickIdentity(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
@@ -88,8 +89,8 @@ function PickCard({
           {String(pick.rank).padStart(2, "0")}
         </div>
         <EntityAvatar
-          githubUsername={github?.handle}
           name={pick.person.fullName}
+          imageUrls={avatarSourcesForPerson(pick.person, identities)}
           size={52}
           rounded="xl"
         />

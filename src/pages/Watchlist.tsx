@@ -12,6 +12,7 @@ import {
   useWatchlist,
 } from "@/hooks/useAnytrace";
 import type { PersonIdentity, UserVcWatchlistItem, VcSourceDraft, WatchlistPerson } from "@/data/anytrace";
+import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
@@ -39,12 +40,15 @@ function SelectedVcRow({
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-4">
-      <div className="min-w-0">
-        <div className="text-sm font-medium truncate">{vcSource.name}</div>
-        <div className="text-xs text-muted-foreground mt-1 truncate">
-          {vcSource.country}
-          {vcSource.sizeLabel ? ` / ${vcSource.sizeLabel}` : ""}
-          {vcSource.sectorFocus ? ` / ${vcSource.sectorFocus}` : ""}
+      <div className="min-w-0 flex items-center gap-3">
+        <EntityAvatar name={vcSource.name} imageUrls={avatarSourcesForVc(vcSource)} size={40} />
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{vcSource.name}</div>
+          <div className="text-xs text-muted-foreground mt-1 truncate">
+            {vcSource.country}
+            {vcSource.sizeLabel ? ` / ${vcSource.sizeLabel}` : ""}
+            {vcSource.sectorFocus ? ` / ${vcSource.sectorFocus}` : ""}
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
@@ -85,7 +89,12 @@ function WatchlistRow({ person }: { person: WatchlistPerson }) {
   return (
     <div className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-border last:border-b-0 items-center">
       <div className="col-span-4 flex items-center gap-3 min-w-0">
-        <EntityAvatar name={person.fullName} githubUsername={github?.handle} size={38} rounded="xl" />
+        <EntityAvatar
+          name={person.fullName}
+          imageUrls={avatarSourcesForPerson(person, person.identities)}
+          size={38}
+          rounded="xl"
+        />
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{person.fullName}</div>
           <div className="text-xs text-muted-foreground truncate">

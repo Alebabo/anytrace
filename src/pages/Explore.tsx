@@ -21,10 +21,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, useGraphData, usePersonIdentities } from "@/hooks/useAnytrace";
 import type { ActivityPlatform, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
+import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 
 type GraphNodeData =
-  | { kind: "vc"; vc: VcSource; highlight: boolean; dim: boolean }
-  | { kind: "person"; person: TrackedPerson; githubUsername?: string; highlight: boolean; dim: boolean; topPick: boolean };
+  | { kind: "vc"; vc: VcSource; highlight: boolean; dim: boolean; imageUrls: string[] }
+  | { kind: "person"; person: TrackedPerson; highlight: boolean; dim: boolean; topPick: boolean; imageUrls: string[] };
 
 type GraphPosition = { x: number; y: number };
 
@@ -69,7 +70,7 @@ function VcNode({ data }: NodeProps<Node<GraphNodeData>>) {
           data.highlight ? "ring-2 ring-accent-indigo shadow-md scale-110" : ""
         } ${data.dim ? "opacity-30" : ""}`}
       >
-        <EntityAvatar name={data.vc.name} githubUsername={data.vc.githubUsername ?? undefined} size={nodeSize} />
+        <EntityAvatar name={data.vc.name} imageUrls={data.imageUrls} size={nodeSize} />
       </div>
     </div>
   );
@@ -86,7 +87,7 @@ function PersonNode({ data }: NodeProps<Node<GraphNodeData>>) {
       <Handle type="target" position={Position.Left} className="!bg-transparent !border-0" />
       <EntityAvatar
         name={data.person.fullName}
-        githubUsername={data.githubUsername}
+        imageUrls={data.imageUrls}
         size={data.topPick ? 64 : 48}
         rounded="xl"
       />
@@ -158,13 +159,23 @@ function buildGraphLayout({
     incomingByPerson.set(edge.targetId, list);
   }
 
-  const topPickPeople = people.filter((person) => topPickIds.has(person.id));
-  const outerPeople = people.filter((person) => !topPickIds.has(person.id));
+  const personSourceIds = new Map<string, string[]>();
+  for (const person of people) {
+    personSourceIds.set(person.id, Array.from(new Set(incomingByPerson.get(person.id) ?? [])));
+  }
 
-  topPickPeople
-    .sort((left, right) => left.fullName.localeCompare(right.fullName))
+  const corePeople = people.filter((person) => (personSourceIds.get(person.id)?.length ?? 0) > 1);
+  const singleConnectionPeople = people.filter((person) => (personSourceIds.get(person.id)?.length ?? 0) === 1);
+  const zeroConnectionPeople = people.filter((person) => (personSourceIds.get(person.id)?.length ?? 0) === 0);
+
+  corePeople
+    .sort((left, right) => {
+      const topDiff = Number(topPickIds.has(right.id)) - Number(topPickIds.has(left.id));
+      if (topDiff !== 0) return topDiff;
+      return left.fullName.localeCompare(right.fullName);
+    })
     .forEach((person, index) => {
-      const sourceIds = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
+      const sourceIds = personSourceIds.get(person.id) ?? [];
       const anchors = sourceIds
         .map((sourceId) => positions.get(sourceId))
         .filter((point): point is GraphPosition => !!point);
@@ -174,30 +185,53 @@ function buildGraphLayout({
               anchors.reduce((sum, point) => sum + point.y, 0) / anchors.length,
               anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length,
             )
-          : (index / Math.max(topPickPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      const innerRadius = Math.max(96, vcRadius * 0.42 + (index % 2) * 28);
-      const angleOffset = ((index % 3) - 1) * 0.28;
+          : (index / Math.max(corePeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const innerRadius = topPickIds.has(person.id)
+        ? Math.max(88, vcRadius * 0.33 + (index % 2) * 22)
+        : Math.max(128, vcRadius * 0.47 + (index % 2) * 24);
+      const angleOffset = ((index % 3) - 1) * 0.24;
       positions.set(person.id, {
         x: Math.cos(baseAngle + angleOffset) * innerRadius,
         y: Math.sin(baseAngle + angleOffset) * innerRadius,
       });
     });
 
-  outerPeople
+  const singleBySource = new Map<string, TrackedPerson[]>();
+  singleConnectionPeople.forEach((person) => {
+    const sourceId = personSourceIds.get(person.id)?.[0];
+    if (!sourceId) return;
+    const list = singleBySource.get(sourceId) ?? [];
+    list.push(person);
+    singleBySource.set(sourceId, list);
+  });
+
+  singleBySource.forEach((sourcePeople, sourceId) => {
+    const anchor = positions.get(sourceId);
+    if (!anchor) return;
+
+    const baseAngle = Math.atan2(anchor.y, anchor.x);
+    sourcePeople
+      .sort((left, right) => {
+        const topDiff = Number(topPickIds.has(right.id)) - Number(topPickIds.has(left.id));
+        if (topDiff !== 0) return topDiff;
+        return left.fullName.localeCompare(right.fullName);
+      })
+      .forEach((person, index) => {
+        const centeredIndex = index - (sourcePeople.length - 1) / 2;
+        const angleOffset = centeredIndex * 0.2;
+        const outerRadius = vcRadius + 180 + Math.abs(centeredIndex) * 18;
+        positions.set(person.id, {
+          x: Math.cos(baseAngle + angleOffset) * outerRadius,
+          y: Math.sin(baseAngle + angleOffset) * outerRadius,
+        });
+      });
+  });
+
+  zeroConnectionPeople
     .sort((left, right) => left.fullName.localeCompare(right.fullName))
     .forEach((person, index) => {
-      const sourceIds = Array.from(new Set(incomingByPerson.get(person.id) ?? []));
-      const anchors = sourceIds
-        .map((sourceId) => positions.get(sourceId))
-        .filter((point): point is GraphPosition => !!point);
-      const baseAngle =
-        anchors.length > 0
-          ? Math.atan2(
-              anchors.reduce((sum, point) => sum + point.y, 0) / anchors.length,
-              anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length,
-            )
-          : (index / Math.max(outerPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      const outerRadius = vcRadius + 210 + Math.floor(index / Math.max(vcCount, 1)) * 104;
+      const baseAngle = (index / Math.max(zeroConnectionPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const outerRadius = vcRadius + 265 + Math.floor(index / Math.max(vcCount, 1)) * 90;
       const angleOffset = ((index % 4) - 1.5) * 0.18;
       positions.set(person.id, {
         x: Math.cos(baseAngle + angleOffset) * outerRadius,
@@ -318,6 +352,7 @@ function GraphInner() {
           vc,
           highlight: vcIds.has(vc.id),
           dim: false,
+          imageUrls: avatarSourcesForVc(vc),
         },
       });
     });
@@ -335,10 +370,13 @@ function GraphInner() {
         data: {
           kind: "person",
           person,
-          githubUsername: identityFor(identities, person.id, "github")?.handle,
           highlight: topPickIds.has(person.id),
           dim: false,
           topPick: topPickIds.has(person.id),
+          imageUrls: avatarSourcesForPerson(
+            person,
+            identities.filter((identity) => identity.personId === person.id),
+          ),
         },
       });
     });
@@ -532,7 +570,7 @@ function GraphInner() {
                   <div className="flex items-start gap-3 min-w-0">
                     <EntityAvatar
                       name={selectedPerson.fullName}
-                      githubUsername={identityFor(identities, selectedPerson.id, "github")?.handle}
+                      imageUrls={avatarSourcesForPerson(selectedPerson, selectedPersonIdentities)}
                       size={44}
                       rounded="xl"
                     />
@@ -615,7 +653,15 @@ function GraphInner() {
                       className="flex w-full items-center gap-3 rounded-2xl bg-surface-sunken px-3 py-2 text-left hover:bg-surface-sunken/80"
                       onClick={() => setSelectedNodeId(person.id)}
                     >
-                      <EntityAvatar name={person.fullName} size={34} rounded="xl" />
+                      <EntityAvatar
+                        name={person.fullName}
+                        imageUrls={avatarSourcesForPerson(
+                          person,
+                          identities.filter((identity) => identity.personId === person.id),
+                        )}
+                        size={34}
+                        rounded="xl"
+                      />
                       <div className="min-w-0">
                         <div className="text-xs font-medium truncate">{person.fullName}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{person.company || person.roleTitle}</div>

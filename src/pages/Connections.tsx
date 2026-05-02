@@ -13,6 +13,7 @@ import {
   useVcSources,
 } from "@/hooks/useAnytrace";
 import type { PersonIdentity } from "@/data/anytrace";
+import { avatarSourcesForPerson } from "@/lib/avatarSources";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
@@ -59,7 +60,12 @@ export default function ConnectionDetail() {
           <>
             <div className="rounded-[28px] border border-border bg-card p-6 md:p-8 shadow-sm">
               <div className="flex items-start gap-4">
-                <EntityAvatar name={person.fullName} githubUsername={github?.handle} size={64} rounded="xl" />
+                <EntityAvatar
+                  name={person.fullName}
+                  imageUrls={avatarSourcesForPerson(person, identities)}
+                  size={64}
+                  rounded="xl"
+                />
                 <div className="min-w-0 flex-1">
                   <h2 className="font-serif text-4xl leading-tight">{person.fullName}</h2>
                   <p className="text-sm text-muted-foreground mt-2">

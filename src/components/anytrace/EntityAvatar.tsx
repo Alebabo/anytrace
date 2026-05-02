@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Props = {
   githubUsername?: string;
+  imageUrls?: string[];
   name: string;
   size?: number;
   className?: string;
@@ -19,14 +20,24 @@ function initialsOf(name: string) {
 
 export function EntityAvatar({
   githubUsername,
+  imageUrls = [],
   name,
   size = 32,
   className = "",
   rounded = "full",
 }: Props) {
-  const [errored, setErrored] = useState(false);
-  const showImage = !!githubUsername && !errored;
+  const fallbackGithubUrl = githubUsername ? `https://github.com/${githubUsername}.png?size=${Math.ceil(size * 2)}` : null;
+  const sources = useMemo(
+    () => [...imageUrls, fallbackGithubUrl].filter((value): value is string => !!value),
+    [fallbackGithubUrl, imageUrls],
+  );
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const activeSource = sources[sourceIndex] ?? null;
   const radius = rounded === "full" ? "rounded-full" : "rounded-xl";
+
+  useEffect(() => {
+    setSourceIndex(0);
+  }, [sources]);
 
   return (
     <div
@@ -34,14 +45,14 @@ export function EntityAvatar({
       style={{ width: size, height: size, fontSize: size * 0.36 }}
       title={name}
     >
-      {showImage ? (
+      {activeSource ? (
         <img
-          src={`https://github.com/${githubUsername}.png?size=${Math.ceil(size * 2)}`}
+          src={activeSource}
           alt={name}
           width={size}
           height={size}
           loading="lazy"
-          onError={() => setErrored(true)}
+          onError={() => setSourceIndex((current) => current + 1)}
           className="h-full w-full object-cover"
         />
       ) : (
