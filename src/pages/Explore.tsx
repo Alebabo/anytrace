@@ -252,6 +252,30 @@ function GraphInner() {
     const filteredEdges = graph.edges.filter((edge) => personIds.has(edge.targetId));
     const vcIds = new Set(filteredEdges.map((edge) => edge.sourceId));
     const visibleVcs = graph.vcs.filter((vc) => vcIds.has(vc.id) || !filteredEdges.length);
+    const siblingOrderByEdgeId = new Map<string, number>();
+    const siblingCountBySource = new Map<string, number>();
+    const edgesBySource = new Map<string, typeof filteredEdges>();
+
+    filteredEdges.forEach((edge) => {
+      const list = edgesBySource.get(edge.sourceId) ?? [];
+      list.push(edge);
+      edgesBySource.set(edge.sourceId, list);
+    });
+
+    edgesBySource.forEach((sourceEdges, sourceId) => {
+      const sorted = [...sourceEdges].sort((left, right) => {
+        const leftY = positionOverrides[left.targetId]?.y ?? 0;
+        const rightY = positionOverrides[right.targetId]?.y ?? 0;
+        if (leftY !== rightY) return leftY - rightY;
+        return left.targetId.localeCompare(right.targetId);
+      });
+
+      siblingCountBySource.set(sourceId, sorted.length);
+      sorted.forEach((edge, index) => {
+        siblingOrderByEdgeId.set(edge.id, index);
+      });
+    });
+
     const layoutPositions = buildGraphLayout({
       vcs: visibleVcs,
       people: filteredPeople,
@@ -297,15 +321,28 @@ function GraphInner() {
     });
 
     filteredEdges.forEach((edge) => {
+      const siblingIndex = siblingOrderByEdgeId.get(edge.id) ?? 0;
+      const siblingCount = siblingCountBySource.get(edge.sourceId) ?? 1;
+      const centeredIndex = siblingIndex - (siblingCount - 1) / 2;
+      const isOuterConnection = !topPickIds.has(edge.targetId);
+
       edges.push({
         id: edge.id,
         source: edge.sourceId,
         target: edge.targetId,
+        type: "smoothstep",
         animated: edge.isTopPick,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        pathOptions: {
+          borderRadius: edge.isTopPick ? 26 : 18,
+          offset: isOuterConnection ? 34 + Math.abs(centeredIndex) * 10 : 24 + Math.abs(centeredIndex) * 8,
+        },
+        zIndex: edge.isTopPick ? 2 : 1,
         style: {
           stroke: platformColor(edge.platform),
           strokeWidth: Math.min(4, Math.max(1.25, edge.eventCount * 1.3)),
-          opacity: edge.isTopPick ? 0.9 : 0.4,
+          opacity: edge.isTopPick ? 0.92 : 0.5,
         },
       });
     });
