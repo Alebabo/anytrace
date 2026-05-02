@@ -26,7 +26,11 @@ type GraphNodeData =
   | { kind: "vc"; vc: VcSource; highlight: boolean; dim: boolean }
   | { kind: "person"; person: TrackedPerson; githubUsername?: string; highlight: boolean; dim: boolean; topPick: boolean };
 
-function identityFor(identities: PersonIdentity[], personId: string, platform: PersonIdentity["platform"]) {
+function identityFor(
+  identities: PersonIdentity[],
+  personId: string,
+  platform: PersonIdentity["platform"],
+) {
   return identities.find((identity) => identity.personId === personId && identity.platform === platform);
 }
 
@@ -75,6 +79,23 @@ const nodeTypes = {
 function platformColor(platform: ActivityPlatform) {
   if (platform === "linkedin") return "hsl(var(--signal-linkedin))";
   return "hsl(var(--foreground))";
+}
+
+function EmptyGraphState({
+  title,
+  body,
+}: {
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="absolute inset-0 grid place-items-center p-6">
+      <div className="max-w-lg rounded-[28px] border border-border bg-card p-8 text-center shadow-sm">
+        <h3 className="text-lg font-medium">{title}</h3>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{body}</p>
+      </div>
+    </div>
+  );
 }
 
 function GraphInner() {
@@ -156,10 +177,13 @@ function GraphInner() {
     return { nodes: [...vcNodes, ...personNodes], edges };
   }, [graph, identities, query, showOnlyTop]);
 
+  const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
+  const hasEdges = (graph?.edges.length ?? 0) > 0;
+
   return (
     <ProductGate
       title="Graph"
-      description="The original Anytrace graph stays in place, now redrawn from the new Supabase model and focused on VCs to people."
+      description="The Anytrace graph is now scoped to your selected VCs and only shows people with actual signal edges from those sources."
     >
       <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] bg-surface-sunken/40">
         <div className="absolute top-3 left-3 right-3 md:top-4 md:left-4 md:right-4 z-10 flex items-center justify-between gap-3 pointer-events-none">
@@ -184,7 +208,7 @@ function GraphInner() {
             </Button>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
-              {"VCs -> people"}
+              Selected VCs only
             </div>
           </div>
         </div>
@@ -194,11 +218,20 @@ function GraphInner() {
             <Skeleton className="h-56 w-80 rounded-[28px]" />
           </div>
         ) : graphQuery.isError ? (
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-              Could not load the graph.
-            </div>
-          </div>
+          <EmptyGraphState
+            title="Could not load the graph"
+            body="The graph data could not be loaded from Supabase right now."
+          />
+        ) : !hasSelectedVcs ? (
+          <EmptyGraphState
+            title="No VCs selected yet"
+            body="Add a few venture accounts in Watchlist first. The graph only renders edges from your personal VC selection."
+          />
+        ) : !hasEdges ? (
+          <EmptyGraphState
+            title="No signal edges yet"
+            body="Your selected VCs are saved, but there are no imported X follow events for them yet. Once sync jobs start writing activity events, the graph will light up automatically."
+          />
         ) : (
           <ReactFlow
             nodes={built.nodes}
@@ -224,13 +257,13 @@ function GraphInner() {
           </ReactFlow>
         )}
 
-        {!graphQuery.isLoading && built.nodes.length > 0 && (
+        {!graphQuery.isLoading && hasSelectedVcs && (
           <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-10 rounded-full border border-border bg-background px-4 py-2 shadow-sm text-xs">
             <div className="flex items-center gap-3">
-              <span>{graph?.vcs.length ?? 0} VCs</span>
-              <span>·</span>
-              <span>{graph?.people.length ?? 0} people</span>
-              <span>·</span>
+              <span>{graph?.vcs.length ?? 0} selected VCs</span>
+              <span>/</span>
+              <span>{graph?.people.length ?? 0} connected people</span>
+              <span>/</span>
               <span>{graph?.edges.length ?? 0} active edges</span>
             </div>
           </div>

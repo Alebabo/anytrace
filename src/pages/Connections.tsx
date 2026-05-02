@@ -64,8 +64,8 @@ export default function ConnectionDetail() {
                   <h2 className="font-serif text-4xl leading-tight">{person.fullName}</h2>
                   <p className="text-sm text-muted-foreground mt-2">
                     {person.roleTitle}
-                    {person.company ? ` · ${person.company}` : ""}
-                    {person.location ? ` · ${person.location}` : ""}
+                    {person.company ? ` / ${person.company}` : ""}
+                    {person.location ? ` / ${person.location}` : ""}
                   </p>
                   <p className="text-sm mt-4 max-w-3xl leading-relaxed">{person.summary}</p>
                   <div className="flex items-center gap-3 mt-5 text-muted-foreground">
@@ -111,13 +111,13 @@ export default function ConnectionDetail() {
                           <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{event.description}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-muted-foreground">
                             <span>{new Date(event.occurredAt).toLocaleDateString()}</span>
-                            <span>·</span>
+                            <span>/</span>
                             <span>{event.platform}</span>
-                            <span>·</span>
+                            <span>/</span>
                             <span>{event.eventType}</span>
                             {vc && (
                               <>
-                                <span>·</span>
+                                <span>/</span>
                                 <span>{vc.firm}</span>
                               </>
                             )}

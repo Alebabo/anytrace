@@ -35,7 +35,7 @@ export function AccessBadge() {
       <Sparkles className="h-3 w-3 text-foreground" />
       {access.status === "active"
         ? "Active"
-        : `Trial${access.daysLeftInTrial != null ? ` · ${access.daysLeftInTrial}d left` : ""}`}
+        : `Trial${access.daysLeftInTrial != null ? ` / ${access.daysLeftInTrial}d left` : ""}`}
     </div>
   );
 }

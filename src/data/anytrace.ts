@@ -1,9 +1,20 @@
 export type IdentityPlatform = "x" | "github" | "linkedin";
 export type ActivityPlatform = IdentityPlatform | "system";
-export type EventType = "vc_follow" | "repo_traction" | "big_tech_exit" | "launch" | "mention";
+export type EventType =
+  | "vc_follow"
+  | "repo_traction"
+  | "big_tech_exit"
+  | "launch"
+  | "mention"
+  | "important_github_follower";
 export type VcTier = "angel" | "microvc" | "vc";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
-export type WeeklyReasonKind = "vc_follow_burst" | "repo_traction" | "big_tech_exit";
+export type WeeklyReasonKind =
+  | "vc_follow_burst"
+  | "repo_traction"
+  | "big_tech_exit"
+  | "important_github_followers";
+export type SyncStatus = "idle" | "pending" | "ok" | "error";
 
 export interface ViewerAccessState {
   isAuthenticated: boolean;
@@ -25,11 +36,40 @@ export interface VcSource {
   country: string;
   city: string;
   xHandle?: string | null;
+  xUserId?: string | null;
   linkedinUrl?: string | null;
   githubUsername?: string | null;
   websiteUrl?: string | null;
   notes: string;
   isSeeded: boolean;
+  createdByUserId?: string | null;
+  syncStatus?: SyncStatus | null;
+  lastXSyncAt?: string | null;
+  lastGithubSyncAt?: string | null;
+  lastSyncError?: string | null;
+}
+
+export interface UserVcWatchlistItem {
+  id: string;
+  userId: string;
+  vcSourceId: string;
+  createdAt: string;
+  vcSource: VcSource;
+}
+
+export interface VcSourceDraft {
+  name: string;
+  title?: string;
+  firm: string;
+  tier?: VcTier;
+  country?: string;
+  city?: string;
+  region?: string;
+  xHandle: string;
+  linkedinUrl?: string;
+  githubUsername?: string;
+  websiteUrl?: string;
+  notes?: string;
 }
 
 export interface TrackedPerson {
@@ -65,6 +105,7 @@ export interface ActivityEvent {
   sourceUrl: string;
   occurredAt: string;
   metadata: Record<string, unknown>;
+  eventFingerprint?: string | null;
 }
 
 export interface WeeklyPickReason {
@@ -97,6 +138,7 @@ export interface WatchlistPerson extends TrackedPerson {
   vcFollowersThisWeek: number;
   githubMomentum: number;
   bigTechExit: boolean;
+  importantGithubFollowers: number;
 }
 
 export interface GraphNode {
@@ -111,4 +153,9 @@ export interface GraphEdge {
   platform: ActivityPlatform;
   eventCount: number;
   isTopPick: boolean;
+}
+
+export interface WatchlistData {
+  selectedVcs: UserVcWatchlistItem[];
+  people: WatchlistPerson[];
 }

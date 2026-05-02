@@ -40,7 +40,7 @@ function PickCard({
               <h3 className="text-xl font-medium leading-tight">{pick.person.fullName}</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 {pick.person.roleTitle}
-                {pick.person.company ? ` · ${pick.person.company}` : ""}
+                {pick.person.company ? ` / ${pick.person.company}` : ""}
               </p>
             </div>
             <div className="text-right shrink-0">
@@ -66,9 +66,9 @@ function PickCard({
           <div className="mt-5 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{pick.vcFollowCount} VC follows</span>
-              <span>·</span>
+              <span>/</span>
               <span>{pick.githubAttentionScore} GitHub delta</span>
-              <span>·</span>
+              <span>/</span>
               <span>{pick.person.location}</span>
             </div>
             <div className="flex items-center gap-2">

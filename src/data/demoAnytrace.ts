@@ -2,6 +2,7 @@ import type {
   ActivityEvent,
   PersonIdentity,
   TrackedPerson,
+  UserVcWatchlistItem,
   VcSource,
   WeeklyPick,
 } from "@/data/anytrace";
@@ -18,11 +19,17 @@ export const demoVcSources: VcSource[] = [
     country: "DE",
     city: "Berlin",
     xHandle: "ricardoseixas",
+    xUserId: "100001",
     linkedinUrl: "https://www.linkedin.com/in/ricardoseixas/",
     githubUsername: null,
     websiteUrl: "https://www.pointnine.com/",
     notes: "Early-stage SaaS and marketplace investor.",
     isSeeded: true,
+    createdByUserId: null,
+    syncStatus: "ok",
+    lastXSyncAt: "2026-05-02T08:00:00Z",
+    lastGithubSyncAt: null,
+    lastSyncError: null,
   },
   {
     id: "vc-saul-klein",
@@ -35,11 +42,17 @@ export const demoVcSources: VcSource[] = [
     country: "UK",
     city: "London",
     xHandle: "saulklein",
+    xUserId: "100002",
     linkedinUrl: "https://www.linkedin.com/in/saulklein/",
     githubUsername: null,
     websiteUrl: "https://www.localglobe.vc/",
     notes: "London-based early-stage operator-investor.",
     isSeeded: true,
+    createdByUserId: null,
+    syncStatus: "ok",
+    lastXSyncAt: "2026-05-02T08:00:00Z",
+    lastGithubSyncAt: null,
+    lastSyncError: null,
   },
   {
     id: "vc-carlotta-perez",
@@ -52,13 +65,27 @@ export const demoVcSources: VcSource[] = [
     country: "UK",
     city: "London",
     xHandle: "carlottacperez",
+    xUserId: "100003",
     linkedinUrl: "https://www.linkedin.com/in/carlottacperez/",
     githubUsername: null,
     websiteUrl: "https://seedcamp.com/",
     notes: "Product-focused investor covering Europe.",
     isSeeded: true,
+    createdByUserId: null,
+    syncStatus: "ok",
+    lastXSyncAt: "2026-05-02T08:00:00Z",
+    lastGithubSyncAt: null,
+    lastSyncError: null,
   },
 ];
+
+export const demoSelectedVcWatchlist: UserVcWatchlistItem[] = demoVcSources.map((vc, index) => ({
+  id: `watch-${vc.id}`,
+  userId: "demo-user",
+  vcSourceId: vc.id,
+  createdAt: `2026-05-02T08:0${index}:00Z`,
+  vcSource: vc,
+}));
 
 export const demoTrackedPeople: TrackedPerson[] = [
   {
@@ -127,17 +154,19 @@ export const demoPersonIdentities: PersonIdentity[] = [
 ];
 
 export const demoActivityEvents: ActivityEvent[] = [
-  { id: "event-lena-1", personId: "person-lena-fischer", vcSourceId: "vc-ricardo-seixas", platform: "x", eventType: "vc_follow", headline: "Ricardo Seixas followed Lena Fischer on X", description: "Point Nine partner added Lena to his radar this week.", sourceUrl: "https://x.com/lenafischer/status/1001", occurredAt: "2026-04-28T08:30:00Z", metadata: { kind: "follow" } },
-  { id: "event-lena-2", personId: "person-lena-fischer", vcSourceId: "vc-saul-klein", platform: "x", eventType: "vc_follow", headline: "Saul Klein followed Lena Fischer on X", description: "LocalGlobe attention landed two days later.", sourceUrl: "https://x.com/lenafischer/status/1002", occurredAt: "2026-04-29T11:00:00Z", metadata: { kind: "follow" } },
-  { id: "event-lena-3", personId: "person-lena-fischer", vcSourceId: "vc-carlotta-perez", platform: "x", eventType: "vc_follow", headline: "Carlotta Perez followed Lena Fischer on X", description: "Seedcamp completed a three-VC burst inside the week.", sourceUrl: "https://x.com/lenafischer/status/1003", occurredAt: "2026-05-01T09:10:00Z", metadata: { kind: "follow" } },
-  { id: "event-lena-4", personId: "person-lena-fischer", vcSourceId: null, platform: "github", eventType: "repo_traction", headline: "TraceLayer hit 1.8k GitHub stars", description: "A new release pushed the repo into high weekly traction.", sourceUrl: "https://github.com/lenafischer/tracelayer", occurredAt: "2026-04-30T16:10:00Z", metadata: { stars: 1800, weekly_star_delta: 430 } },
-  { id: "event-lena-5", personId: "person-lena-fischer", vcSourceId: null, platform: "system", eventType: "big_tech_exit", headline: "Lena left Stripe to build full-time", description: "Former Stripe product lead is now building TraceLayer full time.", sourceUrl: "https://www.linkedin.com/in/lena-fischer/", occurredAt: "2026-04-27T07:00:00Z", metadata: { company: "Stripe" } },
-  { id: "event-jonah-1", personId: "person-jonah-larsen", vcSourceId: "vc-ricardo-seixas", platform: "x", eventType: "vc_follow", headline: "Ricardo Seixas followed Jonah Larsen on X", description: "Interest appeared after a recent demo thread.", sourceUrl: "https://x.com/jonahlarsen/status/2001", occurredAt: "2026-04-30T12:00:00Z", metadata: { kind: "follow" } },
-  { id: "event-jonah-2", personId: "person-jonah-larsen", vcSourceId: "vc-saul-klein", platform: "x", eventType: "vc_follow", headline: "Saul Klein followed Jonah Larsen on X", description: "Second VC signal, but still below the hard threshold.", sourceUrl: "https://x.com/jonahlarsen/status/2002", occurredAt: "2026-05-01T10:00:00Z", metadata: { kind: "follow" } },
-  { id: "event-jonah-3", personId: "person-jonah-larsen", vcSourceId: null, platform: "github", eventType: "repo_traction", headline: "CachePilot crossed 950 GitHub stars", description: "Open-source growth is strong across the past seven days.", sourceUrl: "https://github.com/jonahlarsen/cachepilot", occurredAt: "2026-05-01T13:30:00Z", metadata: { stars: 950, weekly_star_delta: 220 } },
-  { id: "event-maya-1", personId: "person-maya-dufour", vcSourceId: "vc-carlotta-perez", platform: "x", eventType: "vc_follow", headline: "Carlotta Perez followed Maya Dufour on X", description: "Seedcamp started tracking Maya after her launch teaser.", sourceUrl: "https://x.com/mayadufour/status/3001", occurredAt: "2026-04-29T15:00:00Z", metadata: { kind: "follow" } },
-  { id: "event-maya-2", personId: "person-maya-dufour", vcSourceId: null, platform: "system", eventType: "big_tech_exit", headline: "Maya Dufour left Google to start up", description: "Former Google product lead is now building in developer tooling.", sourceUrl: "https://www.linkedin.com/in/maya-dufour/", occurredAt: "2026-04-28T09:45:00Z", metadata: { company: "Google" } },
-  { id: "event-tobias-1", personId: "person-tobias-lindholm", vcSourceId: "vc-ricardo-seixas", platform: "x", eventType: "vc_follow", headline: "Ricardo Seixas followed Tobias Lindholm on X", description: "A first signal, but not yet enough for a weekly pick.", sourceUrl: "https://x.com/tobiaslindholm/status/4001", occurredAt: "2026-05-01T08:00:00Z", metadata: { kind: "follow" } },
+  { id: "event-lena-1", personId: "person-lena-fischer", vcSourceId: "vc-ricardo-seixas", platform: "x", eventType: "vc_follow", headline: "Ricardo Seixas followed Lena Fischer on X", description: "Point Nine partner added Lena to his radar this week.", sourceUrl: "https://x.com/lenafischer/status/1001", occurredAt: "2026-04-28T08:30:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-ricardo-seixas:lenafischer" },
+  { id: "event-lena-2", personId: "person-lena-fischer", vcSourceId: "vc-saul-klein", platform: "x", eventType: "vc_follow", headline: "Saul Klein followed Lena Fischer on X", description: "LocalGlobe attention landed two days later.", sourceUrl: "https://x.com/lenafischer/status/1002", occurredAt: "2026-04-29T11:00:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-saul-klein:lenafischer" },
+  { id: "event-lena-3", personId: "person-lena-fischer", vcSourceId: "vc-carlotta-perez", platform: "x", eventType: "vc_follow", headline: "Carlotta Perez followed Lena Fischer on X", description: "Seedcamp completed a three-VC burst inside the week.", sourceUrl: "https://x.com/lenafischer/status/1003", occurredAt: "2026-05-01T09:10:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-carlotta-perez:lenafischer" },
+  { id: "event-lena-4", personId: "person-lena-fischer", vcSourceId: null, platform: "github", eventType: "repo_traction", headline: "TraceLayer hit 1.8k GitHub stars", description: "A new release pushed the repo into high weekly traction.", sourceUrl: "https://github.com/lenafischer/tracelayer", occurredAt: "2026-04-30T16:10:00Z", metadata: { stars: 1800, weekly_star_delta: 430 }, eventFingerprint: "github-traction:person-lena-fischer:tracelayer:2026-04-30" },
+  { id: "event-lena-5", personId: "person-lena-fischer", vcSourceId: null, platform: "system", eventType: "big_tech_exit", headline: "Lena left Stripe to build full-time", description: "Former Stripe product lead is now building TraceLayer full time.", sourceUrl: "https://www.linkedin.com/in/lena-fischer/", occurredAt: "2026-04-27T07:00:00Z", metadata: { company: "Stripe" }, eventFingerprint: "system-exit:person-lena-fischer" },
+  { id: "event-lena-6", personId: "person-lena-fischer", vcSourceId: null, platform: "github", eventType: "important_github_follower", headline: "Lena gained two high-signal GitHub followers", description: "Two OSS-heavy GitHub users followed Lena this week.", sourceUrl: "https://github.com/lenafischer?tab=followers", occurredAt: "2026-05-01T18:20:00Z", metadata: { follower_count: 2, importance_score: 1850 }, eventFingerprint: "github-important-followers:person-lena-fischer:2026-05-01" },
+  { id: "event-jonah-1", personId: "person-jonah-larsen", vcSourceId: "vc-ricardo-seixas", platform: "x", eventType: "vc_follow", headline: "Ricardo Seixas followed Jonah Larsen on X", description: "Interest appeared after a recent demo thread.", sourceUrl: "https://x.com/jonahlarsen/status/2001", occurredAt: "2026-04-30T12:00:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-ricardo-seixas:jonahlarsen" },
+  { id: "event-jonah-2", personId: "person-jonah-larsen", vcSourceId: "vc-saul-klein", platform: "x", eventType: "vc_follow", headline: "Saul Klein followed Jonah Larsen on X", description: "Second VC signal, but still below the hard threshold.", sourceUrl: "https://x.com/jonahlarsen/status/2002", occurredAt: "2026-05-01T10:00:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-saul-klein:jonahlarsen" },
+  { id: "event-jonah-3", personId: "person-jonah-larsen", vcSourceId: null, platform: "github", eventType: "repo_traction", headline: "CachePilot crossed 950 GitHub stars", description: "Open-source growth is strong across the past seven days.", sourceUrl: "https://github.com/jonahlarsen/cachepilot", occurredAt: "2026-05-01T13:30:00Z", metadata: { stars: 950, weekly_star_delta: 220 }, eventFingerprint: "github-traction:person-jonah-larsen:cachepilot:2026-05-01" },
+  { id: "event-jonah-4", personId: "person-jonah-larsen", vcSourceId: null, platform: "github", eventType: "important_github_follower", headline: "Jonah gained a new high-signal GitHub follower", description: "A maintainer with multiple starred repos followed Jonah.", sourceUrl: "https://github.com/jonahlarsen?tab=followers", occurredAt: "2026-05-01T17:00:00Z", metadata: { follower_count: 1, importance_score: 920 }, eventFingerprint: "github-important-followers:person-jonah-larsen:2026-05-01" },
+  { id: "event-maya-1", personId: "person-maya-dufour", vcSourceId: "vc-carlotta-perez", platform: "x", eventType: "vc_follow", headline: "Carlotta Perez followed Maya Dufour on X", description: "Seedcamp started tracking Maya after her launch teaser.", sourceUrl: "https://x.com/mayadufour/status/3001", occurredAt: "2026-04-29T15:00:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-carlotta-perez:mayadufour" },
+  { id: "event-maya-2", personId: "person-maya-dufour", vcSourceId: null, platform: "system", eventType: "big_tech_exit", headline: "Maya Dufour left Google to start up", description: "Former Google product lead is now building in developer tooling.", sourceUrl: "https://www.linkedin.com/in/maya-dufour/", occurredAt: "2026-04-28T09:45:00Z", metadata: { company: "Google" }, eventFingerprint: "system-exit:person-maya-dufour" },
+  { id: "event-tobias-1", personId: "person-tobias-lindholm", vcSourceId: "vc-ricardo-seixas", platform: "x", eventType: "vc_follow", headline: "Ricardo Seixas followed Tobias Lindholm on X", description: "A first signal, but not yet enough for a weekly pick.", sourceUrl: "https://x.com/tobiaslindholm/status/4001", occurredAt: "2026-05-01T08:00:00Z", metadata: { kind: "follow" }, eventFingerprint: "x-follow:vc-ricardo-seixas:tobiaslindholm" },
 ];
 
 export const demoWeeklyPicks: WeeklyPick[] = [

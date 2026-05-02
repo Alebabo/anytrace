@@ -16,7 +16,14 @@ export type Database = {
         Row: {
           created_at: string;
           description: string;
-          event_type: "vc_follow" | "repo_traction" | "big_tech_exit" | "launch" | "mention";
+          event_fingerprint: string | null;
+          event_type:
+            | "vc_follow"
+            | "repo_traction"
+            | "big_tech_exit"
+            | "launch"
+            | "mention"
+            | "important_github_follower";
           headline: string;
           id: string;
           metadata: Json;
@@ -29,7 +36,14 @@ export type Database = {
         Insert: {
           created_at?: string;
           description?: string;
-          event_type: "vc_follow" | "repo_traction" | "big_tech_exit" | "launch" | "mention";
+          event_fingerprint?: string | null;
+          event_type:
+            | "vc_follow"
+            | "repo_traction"
+            | "big_tech_exit"
+            | "launch"
+            | "mention"
+            | "important_github_follower";
           headline: string;
           id?: string;
           metadata?: Json;
@@ -42,7 +56,14 @@ export type Database = {
         Update: {
           created_at?: string;
           description?: string;
-          event_type?: "vc_follow" | "repo_traction" | "big_tech_exit" | "launch" | "mention";
+          event_fingerprint?: string | null;
+          event_type?:
+            | "vc_follow"
+            | "repo_traction"
+            | "big_tech_exit"
+            | "launch"
+            | "mention"
+            | "important_github_follower";
           headline?: string;
           id?: string;
           metadata?: Json;
@@ -167,6 +188,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_vc_watchlist_items: {
+        Row: {
+          created_at: string;
+          id: string;
+          user_id: string;
+          vc_source_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          user_id: string;
+          vc_source_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          user_id?: string;
+          vc_source_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_vc_watchlist_items_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "user_vc_watchlist_items_vc_source_id_fkey";
+            columns: ["vc_source_id"];
+            isOneToOne: false;
+            referencedRelation: "vc_sources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tracked_people: {
         Row: {
           avatar_url: string | null;
@@ -216,59 +273,77 @@ export type Database = {
         Row: {
           city: string;
           country: string;
+          created_by_user_id: string | null;
           created_at: string;
           firm: string;
           github_username: string | null;
           id: string;
           is_seeded: boolean;
+          last_github_sync_at: string | null;
+          last_sync_error: string | null;
+          last_x_sync_at: string | null;
           linkedin_url: string | null;
           name: string;
           notes: string;
           region: string;
           slug: string;
+          sync_status: "idle" | "pending" | "ok" | "error";
           tier: "angel" | "microvc" | "vc";
           title: string;
           updated_at: string;
           website_url: string | null;
           x_handle: string | null;
+          x_user_id: string | null;
         };
         Insert: {
           city?: string;
           country: string;
+          created_by_user_id?: string | null;
           created_at?: string;
           firm: string;
           github_username?: string | null;
           id?: string;
           is_seeded?: boolean;
+          last_github_sync_at?: string | null;
+          last_sync_error?: string | null;
+          last_x_sync_at?: string | null;
           linkedin_url?: string | null;
           name: string;
           notes?: string;
           region?: string;
           slug: string;
+          sync_status?: "idle" | "pending" | "ok" | "error";
           tier?: "angel" | "microvc" | "vc";
           title: string;
           updated_at?: string;
           website_url?: string | null;
           x_handle?: string | null;
+          x_user_id?: string | null;
         };
         Update: {
           city?: string;
           country?: string;
+          created_by_user_id?: string | null;
           created_at?: string;
           firm?: string;
           github_username?: string | null;
           id?: string;
           is_seeded?: boolean;
+          last_github_sync_at?: string | null;
+          last_sync_error?: string | null;
+          last_x_sync_at?: string | null;
           linkedin_url?: string | null;
           name?: string;
           notes?: string;
           region?: string;
           slug?: string;
+          sync_status?: "idle" | "pending" | "ok" | "error";
           tier?: "angel" | "microvc" | "vc";
           title?: string;
           updated_at?: string;
           website_url?: string | null;
           x_handle?: string | null;
+          x_user_id?: string | null;
         };
         Relationships: [];
       };
@@ -279,7 +354,11 @@ export type Database = {
           display_order: number;
           id: string;
           metric_value: number | null;
-          reason_kind: "vc_follow_burst" | "repo_traction" | "big_tech_exit";
+          reason_kind:
+            | "vc_follow_burst"
+            | "repo_traction"
+            | "big_tech_exit"
+            | "important_github_followers";
           snapshot_id: string;
           source_event_id: string | null;
           title: string;
@@ -290,7 +369,11 @@ export type Database = {
           display_order?: number;
           id?: string;
           metric_value?: number | null;
-          reason_kind: "vc_follow_burst" | "repo_traction" | "big_tech_exit";
+          reason_kind:
+            | "vc_follow_burst"
+            | "repo_traction"
+            | "big_tech_exit"
+            | "important_github_followers";
           snapshot_id: string;
           source_event_id?: string | null;
           title: string;
@@ -301,7 +384,11 @@ export type Database = {
           display_order?: number;
           id?: string;
           metric_value?: number | null;
-          reason_kind?: "vc_follow_burst" | "repo_traction" | "big_tech_exit";
+          reason_kind?:
+            | "vc_follow_burst"
+            | "repo_traction"
+            | "big_tech_exit"
+            | "important_github_followers";
           snapshot_id?: string;
           source_event_id?: string | null;
           title?: string;

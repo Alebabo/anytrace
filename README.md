@@ -1,43 +1,62 @@
-# Anytrace v1
+# Anytrace v1.1
 
-Anytrace is now a Supabase-backed frontend for VC and scout teams. The app uses only the new Supabase data model and keeps the current Anytrace graph feel with a slimmer product surface:
+Anytrace is a Supabase-backed frontend for VC and scout teams.
 
 - `Main`: weekly top picks
-- `Graph`: VC-to-person signal graph
-- `Watchlist`: tracked people and identities
+- `Graph`: signal graph scoped to the user's selected VCs
+- `Watchlist`: personal VC selection plus tracked people
 - `Settings`: magic-link auth, demo mode, trial state, billing readiness
 
 ## Local development
 
-1. Install dependencies:
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-2. Copy the env file and add your Supabase project values:
+2. Copy the env file and add your Supabase values
 
 ```bash
 cp .env.example .env.local
 ```
 
-3. Apply the Supabase migration and seed data from `supabase/migrations/20260502093000_anytrace_v1.sql`.
+3. Apply both Supabase migrations
 
-4. Start the app:
+- `supabase/migrations/20260502093000_anytrace_v1.sql`
+- `supabase/migrations/20260502173000_anytrace_v11_watchlists_and_sync.sql`
+
+4. Start the app
 
 ```bash
 npm run dev
 ```
 
-For magic-link auth, set `VITE_SITE_URL` to the exact URL Supabase should redirect back to.
-Examples:
+## Sync functions
 
-- local: `http://localhost:8080`
-- Vercel: `https://your-app.vercel.app`
+Anytrace now includes two scheduled sync functions:
+
+- `sync-x-follows`
+- `sync-github-signals`
+
+They expect these server-side env vars in Supabase:
+
+- `X_BEARER_TOKEN`
+- `GITHUB_TOKEN`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- optional `GITHUB_IMPORTANCE_THRESHOLD`
+- optional `GITHUB_STAR_DELTA_THRESHOLD`
+
+Recommended scheduling:
+
+- `sync-x-follows`: every 30-60 minutes
+- `sync-github-signals`: every 2-6 hours
 
 ## Notes
 
-- The app no longer uses the old external API flow or old Supabase functions.
-- Demo mode can bypass Magic Link locally and uses seeded Anytrace data.
-- Stripe checkout is intentionally not live yet; the app already models trial and subscription state in Supabase and gates access after trial expiry.
-- LinkedIn is present in the schema and UI profile links, but full ingestion is deferred.
+- The graph only shows signals from the VCs a user selected in Watchlist.
+- Demo mode bypasses Magic Link locally and uses seeded Anytrace data.
+- X v1 focuses on new follows from selected VC accounts.
+- GitHub v1 focuses on repo traction plus important new followers.
+- LinkedIn stays in the schema and UI links, but full ingest is deferred.
