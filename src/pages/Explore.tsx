@@ -28,6 +28,23 @@ type GraphNodeData =
 
 type GraphPosition = { x: number; y: number };
 
+function getVcSizeBucket(sizeLabel?: string | null) {
+  const normalized = (sizeLabel ?? "").toLowerCase();
+
+  if (normalized.includes("mittel")) return "medium";
+  if (normalized.includes("klein")) return "small";
+  if (normalized.includes("gross") || normalized.includes("gro") || normalized.includes("large")) return "large";
+  return "medium";
+}
+
+function getVcNodeSize(sizeLabel?: string | null) {
+  const bucket = getVcSizeBucket(sizeLabel);
+
+  if (bucket === "large") return 64;
+  if (bucket === "small") return 40;
+  return 52;
+}
+
 function identityFor(
   identities: PersonIdentity[],
   personId: string,
@@ -38,6 +55,8 @@ function identityFor(
 
 function VcNode({ data }: NodeProps<Node<GraphNodeData>>) {
   if (data.kind !== "vc") return null;
+  const nodeSize = getVcNodeSize(data.vc.sizeLabel);
+
   return (
     <div className="relative">
       <Handle
@@ -46,11 +65,11 @@ function VcNode({ data }: NodeProps<Node<GraphNodeData>>) {
         className="!h-2.5 !w-2.5 !border-2 !border-background !bg-foreground"
       />
       <div
-        className={`cursor-pointer rounded-full bg-background ring-1 ring-border p-1 transition-all ${
+        className={`cursor-pointer rounded-full bg-background ring-1 ring-border p-1.5 transition-all ${
           data.highlight ? "ring-2 ring-accent-indigo shadow-md scale-110" : ""
         } ${data.dim ? "opacity-30" : ""}`}
       >
-        <EntityAvatar name={data.vc.name} githubUsername={data.vc.githubUsername ?? undefined} size={48} />
+        <EntityAvatar name={data.vc.name} githubUsername={data.vc.githubUsername ?? undefined} size={nodeSize} />
       </div>
     </div>
   );
@@ -120,13 +139,15 @@ function buildGraphLayout({
 }) {
   const positions = new Map<string, GraphPosition>();
   const vcCount = Math.max(vcs.length, 1);
-  const vcRadius = Math.max(220, vcCount * 22);
+  const largestVcSize = vcs.reduce((largest, vc) => Math.max(largest, getVcNodeSize(vc.sizeLabel)), 52);
+  const vcRadius = Math.max(320, vcCount * 34 + largestVcSize * 1.8);
 
   vcs.forEach((vc, index) => {
     const angle = (index / vcCount) * Math.PI * 2 - Math.PI / 2;
+    const sizeOffset = getVcNodeSize(vc.sizeLabel) - 52;
     positions.set(vc.id, {
-      x: Math.cos(angle) * vcRadius,
-      y: Math.sin(angle) * vcRadius,
+      x: Math.cos(angle) * (vcRadius + sizeOffset),
+      y: Math.sin(angle) * (vcRadius + sizeOffset),
     });
   });
 
@@ -154,7 +175,7 @@ function buildGraphLayout({
               anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length,
             )
           : (index / Math.max(topPickPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      const innerRadius = Math.max(70, vcRadius * 0.46 + (index % 2) * 26);
+      const innerRadius = Math.max(96, vcRadius * 0.42 + (index % 2) * 28);
       const angleOffset = ((index % 3) - 1) * 0.28;
       positions.set(person.id, {
         x: Math.cos(baseAngle + angleOffset) * innerRadius,
@@ -176,7 +197,7 @@ function buildGraphLayout({
               anchors.reduce((sum, point) => sum + point.x, 0) / anchors.length,
             )
           : (index / Math.max(outerPeople.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      const outerRadius = vcRadius + 165 + Math.floor(index / Math.max(vcCount, 1)) * 90;
+      const outerRadius = vcRadius + 210 + Math.floor(index / Math.max(vcCount, 1)) * 104;
       const angleOffset = ((index % 4) - 1.5) * 0.18;
       positions.set(person.id, {
         x: Math.cos(baseAngle + angleOffset) * outerRadius,
