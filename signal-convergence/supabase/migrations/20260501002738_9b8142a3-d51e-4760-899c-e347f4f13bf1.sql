@@ -1,0 +1,2 @@
+ALTER TABLE public.signals 
+  ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';

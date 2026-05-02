@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Anytrace — Project A × Yellow VC brand
+ * Dark petrol/teal background, yellow accent, monospace + geometric sans.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+@layer base {
+  :root {
+    /* Light — Project A × Yellow VC */
+    --background: 0 0% 100%;
+    --foreground: 174 50% 8%;
+
+    --surface: 48 30% 98%;
+    --surface-elevated: 0 0% 100%;
+    --surface-sunken: 48 25% 96%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 174 50% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 174 50% 8%;
+
+    /* Primary = deep petrol (Project A vibe) */
+    --primary: 174 60% 12%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Accent — Yellow */
+    --accent-indigo: 174 60% 12%;
+    --accent-indigo-foreground: 50 95% 60%;
+    --accent-indigo-soft: 50 95% 92%;
+
+    --secondary: 48 25% 95%;
+    --secondary-foreground: 174 50% 12%;
+
+    --muted: 48 20% 95%;
+    --muted-foreground: 174 12% 42%;
+
+    --accent: 50 95% 55%;
+    --accent-foreground: 174 60% 10%;
+
+    --destructive: 8 80% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --signal-twitter: 174 50% 15%;
+    --signal-linkedin: 174 60% 12%;
+    --signal-github: 174 50% 15%;
+
+    --tier-angel: 50 95% 50%;
+    --tier-angel-soft: 50 95% 92%;
+    --tier-microvc: 174 50% 12%;
+    --tier-microvc-soft: 48 25% 94%;
+    --tier-vc: 174 12% 45%;
+
+    --success: 152 65% 38%;
+    --warning: 38 92% 50%;
+
+    --border: 48 15% 88%;
+    --border-strong: 48 12% 78%;
+    --input: 48 15% 88%;
+    --ring: 174 60% 12%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 48 30% 97%;
+    --sidebar-foreground: 174 30% 25%;
+    --sidebar-primary: 174 60% 12%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 48 25% 93%;
+    --sidebar-accent-foreground: 174 50% 12%;
+    --sidebar-border: 48 15% 88%;
+    --sidebar-ring: 174 60% 12%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(174 30% 10% / 0.04);
+    --shadow-sm: 0 1px 2px 0 hsl(174 30% 10% / 0.06);
+    --shadow-md: 0 4px 16px -4px hsl(174 30% 10% / 0.08);
+    --shadow-lg: 0 16px 40px -12px hsl(174 30% 10% / 0.12);
+
+    --gradient-convergence: linear-gradient(135deg, hsl(174 60% 12%), hsl(174 50% 25%));
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html {
+    font-feature-settings: "ss01", "ss02", "cv11";
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    letter-spacing: -0.011em;
+  }
+  .font-serif {
+    /* Repurposed: now a tight display sans, not serif */
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+  }
+  .font-display {
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+  }
+  .font-mono {
+    font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-feature-settings: "ss01";
+  }
+}
+
+@layer components {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .evidence-rail::before {
+    content: "";
+    position: absolute;
+    left: 17px;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    background: hsl(var(--border));
+  }
+}
+
+@layer utilities {
+  .ring-focus {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
