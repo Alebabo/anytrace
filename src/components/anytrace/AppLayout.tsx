@@ -21,8 +21,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import anytraceLogo from "@/assets/anytrace-logo.png";
-import yellowLogo from "@/assets/yellow-logo.svg";
-import projectALogo from "@/assets/project-a-logo.png";
 import { AccessBadge } from "@/components/anytrace/AccessBadge";
 import { useAccessState, useSignOut } from "@/hooks/useAnytrace";
 
@@ -112,23 +110,10 @@ export default function AppLayout() {
         {!sidebarCollapsed && (
           <div className="p-4">
             <div className="rounded-2xl border border-sidebar-border bg-background/60 px-3 py-3">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Brand kept intact</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Anytrace</p>
               <p className="text-xs text-sidebar-foreground mt-2 leading-relaxed">
-                Same Anytrace identity, lighter product surface, tighter weekly signal review.
+                Weekly top picks, a focused signal graph, and a simpler product surface powered only by the new Supabase model.
               </p>
-              <div className="flex items-center justify-center gap-3 px-2 pt-4">
-                <img
-                  src={yellowLogo}
-                  alt="Yellow"
-                  className="h-5 w-auto object-contain [filter:invert(1)_brightness(0.15)]"
-                />
-                <span className="text-muted-foreground text-sm">x</span>
-                <img
-                  src={projectALogo}
-                  alt="Project A"
-                  className="h-5 w-auto object-contain [filter:invert(1)_brightness(0.15)]"
-                />
-              </div>
             </div>
           </div>
         )}

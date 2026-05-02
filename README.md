@@ -1,11 +1,11 @@
 # Anytrace v1
 
-Anytrace is now a Supabase-backed frontend for VC/scout teams. The app keeps the existing Anytrace brand and graph feel, but the product surface is slimmer:
+Anytrace is now a Supabase-backed frontend for VC and scout teams. The app uses only the new Supabase data model and keeps the current Anytrace graph feel with a slimmer product surface:
 
 - `Main`: weekly top picks
 - `Graph`: VC-to-person signal graph
 - `Watchlist`: tracked people and identities
-- `Settings`: magic-link auth, trial state, billing readiness
+- `Settings`: magic-link auth, demo mode, trial state, billing readiness
 
 ## Local development
 
@@ -37,7 +37,7 @@ Examples:
 
 ## Notes
 
-- The old legacy API dependency has been removed from the active product flow.
-- Legacy build-tool leftovers have been removed.
-- Stripe checkout is intentionally not live yet; the app already models trial/subscription state in Supabase and gates access after trial expiry.
+- The app no longer uses the old external API flow or old Supabase functions.
+- Demo mode can bypass Magic Link locally and uses seeded Anytrace data.
+- Stripe checkout is intentionally not live yet; the app already models trial and subscription state in Supabase and gates access after trial expiry.
 - LinkedIn is present in the schema and UI profile links, but full ingestion is deferred.

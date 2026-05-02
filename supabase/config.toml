@@ -1,7 +1,1 @@
 project_id = "kjnamxtncogofsbvfywh"
-
-[functions.ingest-signals]
-verify_jwt = false
-
-[functions.investor-signal-search]
-verify_jwt = false

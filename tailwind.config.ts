@@ -90,7 +90,7 @@ export default {
         lg: "var(--shadow-lg)",
       },
       backgroundImage: {
-        "gradient-convergence": "var(--gradient-convergence)",
+        "gradient-brand": "var(--gradient-brand)",
       },
       borderRadius: {
         lg: "var(--radius)",

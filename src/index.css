@@ -4,12 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Anytrace — Project A × Yellow VC brand
- * Dark petrol/teal background, yellow accent, monospace + geometric sans.
- */
+/* Anytrace brand system */
 @layer base {
   :root {
-    /* Light — Project A × Yellow VC */
+    /* Light Anytrace palette */
     --background: 0 0% 100%;
     --foreground: 174 50% 8%;
 
@@ -23,11 +21,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 174 50% 8%;
 
-    /* Primary = deep petrol (Project A vibe) */
     --primary: 174 60% 12%;
     --primary-foreground: 0 0% 100%;
 
-    /* Accent — Yellow */
     --accent-indigo: 174 60% 12%;
     --accent-indigo-foreground: 50 95% 60%;
     --accent-indigo-soft: 50 95% 92%;
@@ -78,7 +74,7 @@
     --shadow-md: 0 4px 16px -4px hsl(174 30% 10% / 0.08);
     --shadow-lg: 0 16px 40px -12px hsl(174 30% 10% / 0.12);
 
-    --gradient-convergence: linear-gradient(135deg, hsl(174 60% 12%), hsl(174 50% 25%));
+    --gradient-brand: linear-gradient(135deg, hsl(174 60% 12%), hsl(174 50% 25%));
   }
 }
 
@@ -94,7 +90,6 @@
     letter-spacing: -0.011em;
   }
   .font-serif {
-    /* Repurposed: now a tight display sans, not serif */
     font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
     font-weight: 500;
     letter-spacing: -0.035em;
