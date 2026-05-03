@@ -1,29 +1,19 @@
-import { useMemo, useState } from "react";
-import { Github, Linkedin, Loader2, Plus, Trash2, Twitter } from "lucide-react";
+import { Github, Linkedin, Trash2, Twitter } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAccessState,
-  useAddGithubPersonToWatchlist,
-  useAddVcToWatchlist,
   usePersonIdentities,
   useRemoveGithubPersonFromWatchlist,
   useRemoveVcFromWatchlist,
-  useTrackedPeople,
-  useVcSources,
   useWatchlist,
 } from "@/hooks/useAnytrace";
 import type {
   PersonIdentity,
-  TrackedPerson,
   UserVcWatchlistItem,
-  VcSource,
-  VcSourceDraft,
   WatchlistPerson,
 } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
@@ -163,264 +153,41 @@ function SelectedGithubRow({
   );
 }
 
-const emptyVcDraft: VcSourceDraft = {
-  name: "",
-  country: "",
-  sizeLabel: "",
-  sectorFocus: "",
-  twitterUrl: "",
-  linkedinUrl: "",
-  githubUsername: "",
-  websiteUrl: "",
-  notes: "",
-};
-
-const emptyGithubDraft = {
-  fullName: "",
-  githubHandle: "",
-  xHandle: "",
-  linkedinHandle: "",
-  roleTitle: "",
-  company: "",
-  location: "",
-  summary: "",
-};
-
 export default function WatchlistPage() {
   const { access } = useAccessState();
   const watchlistQuery = useWatchlist(access.isAuthenticated);
-  const vcCatalogQuery = useVcSources(access.isAuthenticated);
-  const peopleQuery = useTrackedPeople(access.isAuthenticated);
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
-  const addVc = useAddVcToWatchlist();
   const removeVc = useRemoveVcFromWatchlist();
-  const addGithubPerson = useAddGithubPersonToWatchlist();
   const removeGithubPerson = useRemoveGithubPersonFromWatchlist();
-
-  const [selectedVcId, setSelectedVcId] = useState("");
-  const [selectedGithubPersonId, setSelectedGithubPersonId] = useState("");
-  const [vcDraft, setVcDraft] = useState<VcSourceDraft>(emptyVcDraft);
-  const [githubDraft, setGithubDraft] = useState(emptyGithubDraft);
 
   const watchlist = watchlistQuery.data;
   const selectedVcs = watchlist?.selectedVcs ?? [];
   const selectedGithubPeople = watchlist?.people ?? [];
   const identities = identitiesQuery.data ?? [];
-  const allPeople = peopleQuery.data ?? [];
-  const allVcs = vcCatalogQuery.data ?? [];
-
-  const selectedVcIds = useMemo(() => new Set(selectedVcs.map((item) => item.vcSourceId)), [selectedVcs]);
-  const selectedGithubIds = useMemo(() => new Set(selectedGithubPeople.map((person) => person.id)), [selectedGithubPeople]);
-
-  const vcOptions = useMemo(
-    () => allVcs.filter((vc) => !selectedVcIds.has(vc.id)),
-    [allVcs, selectedVcIds],
-  );
-
-  const githubOptions = useMemo(
-    () =>
-      allPeople
-        .filter((person) => !selectedGithubIds.has(person.id))
-        .map((person) => ({
-          person,
-          identities: identities.filter((identity) => identity.personId === person.id),
-        }))
-        .filter((entry) => entry.identities.some((identity) => identity.platform === "github")),
-    [allPeople, identities, selectedGithubIds],
-  );
-
-  const addExistingVc = async () => {
-    const vc = vcOptions.find((entry) => entry.id === selectedVcId);
-    if (!vc) return;
-
-    await addVc.mutateAsync({
-      name: vc.name,
-      country: vc.country,
-      sizeLabel: vc.sizeLabel ?? vc.title,
-      sectorFocus: vc.sectorFocus ?? vc.firm,
-      twitterUrl: vc.twitterUrl ?? vc.xHandle ?? "",
-      linkedinUrl: vc.linkedinUrl ?? "",
-      githubUsername: vc.githubUsername ?? "",
-      websiteUrl: vc.websiteUrl ?? "",
-      notes: vc.notes,
-      city: vc.city,
-      region: vc.region,
-      tier: vc.tier,
-    });
-    setSelectedVcId("");
-  };
-
-  const addExistingGithubPerson = async () => {
-    const entry = githubOptions.find((option) => option.person.id === selectedGithubPersonId);
-    if (!entry) return;
-
-    await addGithubPerson.mutateAsync({
-      existing: entry,
-    });
-    setSelectedGithubPersonId("");
-  };
-
-  const submitVcDraft = async () => {
-    await addVc.mutateAsync(vcDraft);
-    setVcDraft(emptyVcDraft);
-  };
-
-  const submitGithubDraft = async () => {
-    await addGithubPerson.mutateAsync({
-      draft: githubDraft,
-    });
-    setGithubDraft(emptyGithubDraft);
-  };
 
   return (
     <ProductGate
       title="Watchlist"
-      description="Build your own VC source list and your own GitHub people list. Both selectors can also create new entries manually."
+      description="Keep the page compact by expanding only the watchlist blocks you want to inspect."
     >
       <div className="px-4 md:px-8 py-10 max-w-6xl mx-auto">
         <div className="flex items-end justify-between gap-6 mb-10 flex-wrap">
           <div>
             <h2 className="font-serif text-5xl leading-[1.05]">Watchlist</h2>
             <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
-              One selector controls which VCs feed your graph. The second keeps a focused list of GitHub-native people you want to track manually.
+              Expand the venture or people watchlist only when you need the full list. The page stays compact by default.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Selected VCs" value={selectedVcs.length} />
             <Stat label="Git people" value={selectedGithubPeople.length} />
-            <Stat label="Available VCs" value={vcOptions.length} />
+            <Stat label="Open cards" value={2} />
           </div>
         </div>
 
         <div className="grid gap-8">
           <Card className="rounded-[28px] border-border px-6 py-3 shadow-none">
-            <Accordion type="multiple" defaultValue={["vc-selector", "git-selector"]} className="w-full">
-              <AccordionItem value="vc-selector" className="border-border">
-                <AccordionTrigger className="py-5 text-left hover:no-underline">
-                  <div>
-                    <div className="text-lg font-medium">VC watchlist</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {selectedVcs.length} selected / {vcOptions.length} more available
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-5">
-                  <div className="flex gap-3">
-                    <select
-                      className="flex h-11 w-full rounded-full border border-input bg-background px-4 text-sm"
-                      value={selectedVcId}
-                      onChange={(event) => setSelectedVcId(event.target.value)}
-                    >
-                      <option value="">Existing VC auswahlen</option>
-                      {vcOptions.map((vc) => (
-                        <option key={vc.id} value={vc.id}>
-                          {vc.name} / {vc.country}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      className="rounded-full"
-                      disabled={addVc.isPending || !selectedVcId}
-                      onClick={addExistingVc}
-                    >
-                      {addVc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    </Button>
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <Input placeholder="VC name" value={vcDraft.name} onChange={(event) => setVcDraft((current) => ({ ...current, name: event.target.value }))} />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input placeholder="Country" value={vcDraft.country} onChange={(event) => setVcDraft((current) => ({ ...current, country: event.target.value }))} />
-                      <Input placeholder="Size" value={vcDraft.sizeLabel} onChange={(event) => setVcDraft((current) => ({ ...current, sizeLabel: event.target.value }))} />
-                    </div>
-                    <Input placeholder="Sector focus" value={vcDraft.sectorFocus} onChange={(event) => setVcDraft((current) => ({ ...current, sectorFocus: event.target.value }))} />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input placeholder="X / Twitter URL" value={vcDraft.twitterUrl} onChange={(event) => setVcDraft((current) => ({ ...current, twitterUrl: event.target.value }))} />
-                      <Input placeholder="LinkedIn URL" value={vcDraft.linkedinUrl} onChange={(event) => setVcDraft((current) => ({ ...current, linkedinUrl: event.target.value }))} />
-                    </div>
-                    <Input placeholder="GitHub username (optional)" value={vcDraft.githubUsername} onChange={(event) => setVcDraft((current) => ({ ...current, githubUsername: event.target.value }))} />
-                    <div className="flex justify-end">
-                      <Button
-                        className="rounded-full"
-                        disabled={
-                          addVc.isPending ||
-                          !vcDraft.name.trim() ||
-                          !vcDraft.country.trim() ||
-                          !vcDraft.sizeLabel.trim() ||
-                          !vcDraft.sectorFocus.trim() ||
-                          !vcDraft.twitterUrl.trim() ||
-                          !vcDraft.linkedinUrl.trim()
-                        }
-                        onClick={submitVcDraft}
-                      >
-                        Add VC manually
-                      </Button>
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="git-selector" className="border-border">
-                <AccordionTrigger className="py-5 text-left hover:no-underline">
-                  <div>
-                    <div className="text-lg font-medium">Git people watchlist</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {selectedGithubPeople.length} selected / {githubOptions.length} more available
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-5">
-                  <div className="flex gap-3">
-                    <select
-                      className="flex h-11 w-full rounded-full border border-input bg-background px-4 text-sm"
-                      value={selectedGithubPersonId}
-                      onChange={(event) => setSelectedGithubPersonId(event.target.value)}
-                    >
-                      <option value="">Existing Git person auswahlen</option>
-                      {githubOptions.map((entry) => {
-                        const github = identityFor(entry.identities, "github");
-                        return (
-                          <option key={entry.person.id} value={entry.person.id}>
-                            {entry.person.fullName} / @{github?.handle ?? "github"}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <Button
-                      className="rounded-full"
-                      disabled={addGithubPerson.isPending || !selectedGithubPersonId}
-                      onClick={addExistingGithubPerson}
-                    >
-                      {addGithubPerson.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    </Button>
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <Input placeholder="Full name" value={githubDraft.fullName} onChange={(event) => setGithubDraft((current) => ({ ...current, fullName: event.target.value }))} />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input placeholder="GitHub handle" value={githubDraft.githubHandle} onChange={(event) => setGithubDraft((current) => ({ ...current, githubHandle: event.target.value }))} />
-                      <Input placeholder="X handle (optional)" value={githubDraft.xHandle} onChange={(event) => setGithubDraft((current) => ({ ...current, xHandle: event.target.value }))} />
-                    </div>
-                    <Input placeholder="LinkedIn handle or URL (optional)" value={githubDraft.linkedinHandle} onChange={(event) => setGithubDraft((current) => ({ ...current, linkedinHandle: event.target.value }))} />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input placeholder="Role title" value={githubDraft.roleTitle} onChange={(event) => setGithubDraft((current) => ({ ...current, roleTitle: event.target.value }))} />
-                      <Input placeholder="Company" value={githubDraft.company} onChange={(event) => setGithubDraft((current) => ({ ...current, company: event.target.value }))} />
-                    </div>
-                    <Input placeholder="Location" value={githubDraft.location} onChange={(event) => setGithubDraft((current) => ({ ...current, location: event.target.value }))} />
-                    <Input placeholder="Short summary (optional)" value={githubDraft.summary} onChange={(event) => setGithubDraft((current) => ({ ...current, summary: event.target.value }))} />
-                    <div className="flex justify-end">
-                      <Button
-                        className="rounded-full"
-                        disabled={addGithubPerson.isPending || !githubDraft.fullName.trim() || !githubDraft.githubHandle.trim()}
-                        onClick={submitGithubDraft}
-                      >
-                        Add Git person manually
-                      </Button>
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
+            <Accordion type="multiple" defaultValue={["selected-vcs", "selected-git-people"]} className="w-full">
               <AccordionItem value="selected-vcs" className="border-border">
                 <AccordionTrigger className="py-5 text-left hover:no-underline">
                   <div>

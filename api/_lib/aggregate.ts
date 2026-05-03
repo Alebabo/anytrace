@@ -1,5 +1,5 @@
-import { supabaseAdmin } from "./supabase";
-import { daysAgoIso, isoWeekStart } from "./time";
+import { supabaseAdmin } from "./supabase.js";
+import { daysAgoIso, isoWeekStart } from "./time.js";
 
 export async function recomputeWeeklyTopPicks() {
   const windowStart = daysAgoIso(7);

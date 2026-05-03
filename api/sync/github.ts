@@ -1,6 +1,6 @@
-import { authorizeSyncRequest } from "../_lib/auth";
-import { sendJson } from "../_lib/http";
-import { syncGithubSignals } from "../_lib/github-sync";
+import { authorizeSyncRequest } from "../_lib/auth.js";
+import { sendJson } from "../_lib/http.js";
+import { syncGithubSignals } from "../_lib/github-sync.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {

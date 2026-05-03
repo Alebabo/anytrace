@@ -1,7 +1,7 @@
 import Stripe from "stripe";
-import { requireEnv } from "../_lib/env";
-import { readRawBody, sendJson } from "../_lib/http";
-import { setUserProState, supabaseAdmin } from "../_lib/supabase";
+import { requireEnv } from "../_lib/env.js";
+import { readRawBody, sendJson } from "../_lib/http.js";
+import { setUserProState, supabaseAdmin } from "../_lib/supabase.js";
 
 const stripe = new Stripe(requireEnv("stripeSecretKey"));
 

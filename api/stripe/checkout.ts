@@ -1,8 +1,8 @@
 import Stripe from "stripe";
-import { requireAuthenticatedUser } from "../_lib/auth";
-import { env, requireEnv } from "../_lib/env";
-import { readJsonBody, sendJson } from "../_lib/http";
-import { getSiteUrlFromRequest } from "../_lib/supabase";
+import { requireAuthenticatedUser } from "../_lib/auth.js";
+import { env, requireEnv } from "../_lib/env.js";
+import { readJsonBody, sendJson } from "../_lib/http.js";
+import { getSiteUrlFromRequest } from "../_lib/supabase.js";
 
 const stripe = new Stripe(requireEnv("stripeSecretKey"));
 

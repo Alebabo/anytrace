@@ -1,6 +1,6 @@
-import { supabaseAdmin } from "./supabase";
-import { fetchXProfile } from "./x-sync";
-import { fetchGithubAvatar } from "./github-sync";
+import { supabaseAdmin } from "./supabase.js";
+import { fetchXProfile } from "./x-sync.js";
+import { fetchGithubAvatar } from "./github-sync.js";
 
 export async function processMediaBackfill(limit = 20) {
   const { data: jobs, error } = await supabaseAdmin

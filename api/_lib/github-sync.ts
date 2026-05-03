@@ -1,8 +1,8 @@
-import { env, requireEnv } from "./env";
-import { supabaseAdmin } from "./supabase";
-import { daysAgoIso, dateDaysAgo } from "./time";
-import { upsertPersonFromIdentity, enqueueAvatarBackfill } from "./people";
-import { recomputeWeeklyTopPicks } from "./aggregate";
+import { env, requireEnv } from "./env.js";
+import { supabaseAdmin } from "./supabase.js";
+import { daysAgoIso, dateDaysAgo } from "./time.js";
+import { upsertPersonFromIdentity, enqueueAvatarBackfill } from "./people.js";
+import { recomputeWeeklyTopPicks } from "./aggregate.js";
 
 type GithubSearchRepo = {
   full_name: string;

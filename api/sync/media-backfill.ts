@@ -1,6 +1,6 @@
-import { authorizeSyncRequest } from "../_lib/auth";
-import { sendJson } from "../_lib/http";
-import { processMediaBackfill } from "../_lib/media-backfill";
+import { authorizeSyncRequest } from "../_lib/auth.js";
+import { sendJson } from "../_lib/http.js";
+import { processMediaBackfill } from "../_lib/media-backfill.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {

@@ -1,7 +1,7 @@
-import { env, requireEnv } from "./env";
-import { supabaseAdmin } from "./supabase";
-import { upsertPersonFromIdentity, enqueueAvatarBackfill } from "./people";
-import { recomputeWeeklyTopPicks } from "./aggregate";
+import { env, requireEnv } from "./env.js";
+import { supabaseAdmin } from "./supabase.js";
+import { upsertPersonFromIdentity, enqueueAvatarBackfill } from "./people.js";
+import { recomputeWeeklyTopPicks } from "./aggregate.js";
 
 type TwitterApiUser = {
   id?: string | number;

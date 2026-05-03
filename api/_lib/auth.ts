@@ -1,6 +1,6 @@
-import { env } from "./env";
-import { getBearerToken, sendJson } from "./http";
-import { getAuthenticatedUser } from "./supabase";
+import { env } from "./env.js";
+import { getBearerToken, sendJson } from "./http.js";
+import { getAuthenticatedUser } from "./supabase.js";
 
 export async function requireAuthenticatedUser(req: any, res: any) {
   const token = getBearerToken(req);

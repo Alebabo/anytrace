@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, useGraphData, usePersonIdentities } from "@/hooks/useAnytrace";
-import type { ActivityPlatform, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
+import type { ActivityPlatform, IdentityPlatform, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 
 type GraphNodeData =
@@ -258,6 +258,7 @@ function GraphInner() {
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const [query, setQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
+  const [platformFilter, setPlatformFilter] = useState<"all" | IdentityPlatform>("all");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [positionOverrides, setPositionOverrides] = useState<Record<string, GraphPosition>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -308,7 +309,11 @@ function GraphInner() {
       return [person.fullName, person.company, person.location].join(" ").toLowerCase().includes(search);
     });
     const personIds = new Set(filteredPeople.map((person) => person.id));
-    const filteredEdges = graph.edges.filter((edge) => personIds.has(edge.targetId));
+    const filteredEdges = graph.edges.filter((edge) => {
+      if (!personIds.has(edge.targetId)) return false;
+      if (platformFilter === "all") return true;
+      return edge.platform === platformFilter;
+    });
     const vcIds = new Set(filteredEdges.map((edge) => edge.sourceId));
     const activeNodeId = selectedNodeId;
     const visibleVcs = graph.vcs;
@@ -396,14 +401,10 @@ function GraphInner() {
         id: edge.id,
         source: edge.sourceId,
         target: edge.targetId,
-        type: "smoothstep",
+        type: "straight",
         animated: edge.isTopPick,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
-        pathOptions: {
-          borderRadius: edge.isTopPick ? 26 : 18,
-          offset: isOuterConnection ? 34 + Math.abs(centeredIndex) * 10 : 24 + Math.abs(centeredIndex) * 8,
-        },
         zIndex: edge.isTopPick ? 2 : 1,
         style: {
           stroke: platformColor(edge.platform),
@@ -414,7 +415,7 @@ function GraphInner() {
     });
 
     return { nodes: [...vcNodes, ...personNodes], edges };
-  }, [graph, identities, positionOverrides, query, selectedNodeId, showOnlyTop]);
+  }, [graph, identities, platformFilter, positionOverrides, query, selectedNodeId, showOnlyTop]);
 
   const focusNode = useCallback(
     (nodeId: string) => {
@@ -496,6 +497,24 @@ function GraphInner() {
             >
               All VCs
             </Button>
+            <div className="hidden md:flex items-center gap-1 rounded-full border border-border bg-background p-1 shadow-sm">
+              {([
+                ["all", "All"],
+                ["x", "X"],
+                ["github", "GitHub"],
+                ["linkedin", "LinkedIn"],
+              ] as const).map(([value, label]) => (
+                <Button
+                  key={value}
+                  variant={platformFilter === value ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setPlatformFilter(value)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
               {showingFallback
@@ -646,6 +665,8 @@ function GraphInner() {
                 </span>
                 <span>/</span>
                 <span>{viewMode === "all" ? "all mode" : "selected mode"}</span>
+                <span>/</span>
+                <span>{platformFilter === "all" ? "all connections" : `${platformFilter} only`}</span>
                 <span>/</span>
                 <span>{graph?.people.length ?? 0} connected people</span>
                 <span>/</span>
