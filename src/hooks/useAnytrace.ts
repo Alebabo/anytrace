@@ -491,14 +491,29 @@ export function useEnableDemoMode() {
 }
 
 export function useLoginAsAle() {
-  const enableDemo = useEnableDemoMode();
   return useMutation({
-    mutationFn: async () =>
-      enableDemo.mutateAsync({
-        id: "ale-user",
-        email: "ale@anytrace.local",
-        fullName: "Ale",
-      }),
+    mutationFn: async () => {
+      const email = (import.meta.env.VITE_ALE_TEST_EMAIL as string | undefined)?.trim();
+      const password = (import.meta.env.VITE_ALE_TEST_PASSWORD as string | undefined)?.trim();
+
+      if (!email || !password) {
+        throw new Error("Missing VITE_ALE_TEST_EMAIL or VITE_ALE_TEST_PASSWORD.");
+      }
+
+      writeDemoMode(false);
+      writeDemoProfile({
+        id: "demo-user",
+        email: "demo@anytrace.local",
+        fullName: "Demo User",
+      });
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+    },
   });
 }
 

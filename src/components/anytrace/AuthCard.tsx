@@ -38,9 +38,9 @@ export function AuthCard() {
   const handleAleMode = async () => {
     try {
       await loginAsAle.mutateAsync();
-      toast.success("Signed in as Ale in local test mode.");
+      toast.success("Signed in as Ale.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start Ale test mode.");
+      toast.error(error instanceof Error ? error.message : "Could not sign in as Ale.");
     }
   };
 
@@ -103,7 +103,7 @@ export function AuthCard() {
 
       <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
         <Shield className="h-3.5 w-3.5" />
-        Trial access is created automatically on first login. Demo mode uses local seeded data and bypasses Supabase auth.
+        Trial access is created automatically on first login. Demo mode uses local seeded data. Ale login uses a real Supabase test account.
       </div>
     </div>
   );
