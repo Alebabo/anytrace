@@ -1,7 +1,0 @@
-project_id = "mfwqhsfmgwzvkodgkrgd"
-
-[functions.sync-x-follows]
-verify_jwt = false
-
-[functions.sync-github-signals]
-verify_jwt = false

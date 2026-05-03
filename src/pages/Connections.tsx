@@ -54,7 +54,7 @@ export default function ConnectionDetail() {
           </div>
         ) : !person ? (
           <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-            This person is no longer in the tracked set.
+            Diese Detailansicht ist aktuell leer, weil keine Personen mehr aus dem alten Backend geladen werden.
           </div>
         ) : (
           <>

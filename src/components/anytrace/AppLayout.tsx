@@ -8,21 +8,18 @@ import {
   Users,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import anytraceLogo from "@/assets/anytrace-logo.png";
 import { AccessBadge } from "@/components/anytrace/AccessBadge";
-import { useAccessState, useSignOut } from "@/hooks/useAnytrace";
+import { useAccessState } from "@/hooks/useAnytrace";
 
 type NavItem = {
   to: string;
@@ -40,7 +37,6 @@ const nav: NavItem[] = [
 export default function AppLayout() {
   const { pathname } = useLocation();
   const { session } = useAccessState();
-  const signOut = useSignOut();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const active = nav.find((item) => (item.to === "/" ? pathname === "/" : pathname.startsWith(item.to)));
@@ -112,7 +108,7 @@ export default function AppLayout() {
             <div className="rounded-2xl border border-sidebar-border bg-background/60 px-3 py-3">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Anytrace</p>
               <p className="text-xs text-sidebar-foreground mt-2 leading-relaxed">
-                Weekly top picks, a focused signal graph, and a simpler product surface powered only by the new Supabase model.
+                Frontend shell without backend, auth, sync routes or seeded data. Ready for a fresh Supabase rebuild.
               </p>
             </div>
           </div>
@@ -155,14 +151,9 @@ export default function AppLayout() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">{session?.user.email ?? "Signed out"}</span>
-                <span className="text-[11px] font-normal text-muted-foreground">Anytrace access</span>
+                <span className="text-sm font-medium">{session?.user.email ?? "frontend-only@anytrace.local"}</span>
+                <span className="text-[11px] font-normal text-muted-foreground">Frontend-only workspace</span>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={!session || signOut.isPending} onClick={() => signOut.mutate()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>

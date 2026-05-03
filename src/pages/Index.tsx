@@ -226,15 +226,15 @@ export default function MainDashboard() {
         <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:flex-wrap md:items-end md:justify-between">
           <div>
             <h2 className="font-serif text-4xl leading-[1.02] text-balance md:text-5xl">
-              Top picks <span className="text-muted-foreground">this week</span>
+              Main <span className="text-muted-foreground">workspace</span>
             </h2>
             <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
-              Ranked primarily by VC attention, then sharpened with big-tech exits and GitHub traction. The product surface is lighter now, but the Anytrace signal logic stays evidence-first.
+              Das bisherige Ranking wurde entfernt. Diese Fläche ist jetzt absichtlich leer, bis wir die neue Datenlogik auf der frischen Supabase-Basis definieren.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface-sunken px-4 py-3 md:max-w-sm">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Rule in force</div>
-            <div className="text-sm mt-1">3 VC follows within 7 days qualifies a person as top-pick ready.</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Reset state</div>
+            <div className="text-sm mt-1">Keine Scores, keine Syncs, keine Demo-Daten.</div>
           </div>
         </div>
 
@@ -247,6 +247,10 @@ export default function MainDashboard() {
         ) : picksQuery.isError || eventsQuery.isError || vcsQuery.isError ? (
           <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
             Could not load weekly picks.
+          </div>
+        ) : (picksQuery.data ?? []).length === 0 ? (
+          <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
+            Es sind aktuell keine Top Picks vorhanden, weil die bisherige Backend- und Seed-Logik vollständig entfernt wurde.
           </div>
         ) : (
           <div className="space-y-4">

@@ -12,7 +12,6 @@ const GraphPage = lazy(() => import("@/pages/Explore"));
 const WatchlistPage = lazy(() => import("@/pages/Watchlist"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const ConnectionDetail = lazy(() => import("@/pages/Connections"));
-const AuthConfirmPage = lazy(() => import("@/pages/AuthConfirm"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -35,7 +34,6 @@ const App = () => (
       <BrowserRouter>
         <Suspense fallback={<AppFallback />}>
           <Routes>
-            <Route path="/auth/confirm" element={<AuthConfirmPage />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<MainDashboard />} />
               <Route path="/graph" element={<GraphPage />} />

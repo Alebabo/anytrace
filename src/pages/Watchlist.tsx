@@ -180,7 +180,7 @@ export default function WatchlistPage() {
           <div>
             <h2 className="font-serif text-4xl leading-[1.05] md:text-5xl">Watchlist</h2>
             <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
-              Expand the venture or people watchlist only when you need the full list. The page stays compact by default.
+              Die Watchlist ist leergeräumt, bis wir die neue Datenstruktur und Persistenz definieren.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -195,13 +195,13 @@ export default function WatchlistPage() {
             <Accordion type="multiple" defaultValue={["selected-vcs", "selected-git-people"]} className="w-full">
               <AccordionItem value="selected-vcs" className="border-border">
                 <AccordionTrigger className="py-5 text-left hover:no-underline">
-                  <div>
-                    <div className="text-lg font-medium">Selected VCs</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      These accounts define the investor side of your graph.
+                    <div>
+                      <div className="text-lg font-medium">Selected VCs</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Aktuell keine gespeicherten VC-Einträge.
+                      </div>
                     </div>
-                  </div>
-                </AccordionTrigger>
+                  </AccordionTrigger>
                 <AccordionContent className="pb-5">
                   {watchlistQuery.isLoading ? (
                     <div className="space-y-3">
@@ -211,7 +211,7 @@ export default function WatchlistPage() {
                     </div>
                   ) : selectedVcs.length === 0 ? (
                     <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                      No VCs selected yet.
+                      Keine VCs vorhanden. Seed- und Fallback-Daten wurden entfernt.
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -230,13 +230,13 @@ export default function WatchlistPage() {
 
               <AccordionItem value="selected-git-people" className="border-b-0 border-border">
                 <AccordionTrigger className="py-5 text-left hover:no-underline">
-                  <div>
-                    <div className="text-lg font-medium">Selected Git people</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Manually curated GitHub-native people for testing and tracking.
+                    <div>
+                      <div className="text-lg font-medium">Selected Git people</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Aktuell keine gespeicherten Personen.
+                      </div>
                     </div>
-                  </div>
-                </AccordionTrigger>
+                  </AccordionTrigger>
                 <AccordionContent className="pb-5">
                   {watchlistQuery.isLoading || identitiesQuery.isLoading ? (
                     <div className="space-y-3">
@@ -246,7 +246,7 @@ export default function WatchlistPage() {
                     </div>
                   ) : selectedGithubPeople.length === 0 ? (
                     <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                      No Git people selected yet.
+                      Keine Personen vorhanden. Auch die bisherigen Test- und Demo-Einträge wurden entfernt.
                     </div>
                   ) : (
                     <div className="space-y-3">

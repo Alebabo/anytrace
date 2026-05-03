@@ -159,7 +159,7 @@ export interface GraphEdge {
   platform: ActivityPlatform;
   eventCount: number;
   isTopPick: boolean;
-  graphSource: "direct" | "fallback";
+  graphSource: "snapshot" | "event";
 }
 
 export interface WatchlistData {
@@ -173,8 +173,6 @@ export interface GraphData {
   events: ActivityEvent[];
   weeklyPicks: WeeklyPick[];
   edges: GraphEdge[];
-  hasSelectedVcs: boolean;
-  viewMode: "selected" | "all";
-  graphSource: "direct" | "fallback" | "empty";
-  orphanedEventCount: number;
+  graphSource: "snapshot" | "event" | "empty";
+  filteredConnectionCount: number;
 }

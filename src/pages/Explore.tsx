@@ -255,8 +255,7 @@ function GraphInner() {
   const reactFlow = useReactFlow();
   const isMobile = useIsMobile();
   const { access } = useAccessState();
-  const [viewMode, setViewMode] = useState<"selected" | "all">("selected");
-  const graphQuery = useGraphData(access.isAuthenticated, viewMode);
+  const graphQuery = useGraphData(access.isAuthenticated);
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const [query, setQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
@@ -454,17 +453,15 @@ function GraphInner() {
     });
   }, [graph]);
 
-  const hasSelectedVcs = graph?.hasSelectedVcs ?? false;
-  const requiresSelection = viewMode === "selected";
   const hasEdges = (graph?.edges.length ?? 0) > 0;
   const hasRenderableNodes = (graph?.vcs.length ?? 0) > 0 || (graph?.people.length ?? 0) > 0;
-  const showingFallback = graph?.graphSource === "fallback";
-  const graphIsPartial = showingFallback || (graph?.orphanedEventCount ?? 0) > 0;
+  const usingEventConnections = graph?.graphSource === "event";
+  const graphIsPartial = usingEventConnections || (graph?.filteredConnectionCount ?? 0) > 0;
 
   return (
     <ProductGate
       title="Graph"
-      description="The Anytrace graph is now scoped to your selected VCs and only shows people with actual signal edges from those sources."
+      description="Der Graph bleibt als UI erhalten, zeigt aber aktuell bewusst keine Verbindungen mehr."
     >
       <div className="relative h-[calc(100vh-7rem)] overflow-hidden bg-surface-sunken/40 sm:h-[calc(100vh-6.5rem)] md:h-[calc(100vh-4rem)]">
         <div className="absolute top-3 left-3 right-3 z-10 flex flex-col gap-3 pointer-events-none md:top-4 md:left-4 md:right-4 xl:flex-row xl:items-center xl:justify-between">
@@ -487,22 +484,6 @@ function GraphInner() {
               <Flame className="h-3.5 w-3.5" />
               Top picks
             </Button>
-            <Button
-              variant={viewMode === "selected" ? "default" : "outline"}
-              size="sm"
-              className="rounded-full"
-              onClick={() => setViewMode("selected")}
-            >
-              Selected VCs
-            </Button>
-            <Button
-              variant={viewMode === "all" ? "default" : "outline"}
-              size="sm"
-              className="rounded-full"
-              onClick={() => setViewMode("all")}
-            >
-              All VCs
-            </Button>
             <div className="flex w-full flex-wrap items-center gap-1 rounded-[20px] border border-border bg-background p-1 shadow-sm md:w-auto md:rounded-full">
               {([
                 ["all", "All"],
@@ -523,11 +504,7 @@ function GraphInner() {
             </div>
             <div className="hidden xl:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
-              {showingFallback
-                ? "Fallback signal view"
-                : viewMode === "all"
-                  ? "All VC sources"
-                  : "Selected VCs only"}
+              {usingEventConnections ? "Event-derived connections" : "Snapshot-backed connections"}
             </div>
           </div>
         </div>
@@ -616,17 +593,12 @@ function GraphInner() {
         ) : graphQuery.isError ? (
           <EmptyGraphState
             title="Could not load the graph"
-            body="The graph data could not be loaded from Supabase right now."
-          />
-        ) : requiresSelection && !hasSelectedVcs ? (
-          <EmptyGraphState
-            title="No VCs selected yet"
-            body="Add a few venture accounts in Watchlist first. The graph only renders edges from your personal VC selection."
+            body="The graph data is unavailable."
           />
         ) : !hasRenderableNodes ? (
           <EmptyGraphState
-            title="Nothing to show yet"
-            body="Anytrace could not find visible VC or people nodes for this graph view yet."
+            title="Graph reset complete"
+            body="Alle bisherigen Verbindungen, Snapshots und Fallback-Daten wurden entfernt. Der Graph wartet jetzt auf das neue Datenmodell."
           />
         ) : (
           <ReactFlow
@@ -662,15 +634,11 @@ function GraphInner() {
           </ReactFlow>
         )}
 
-        {!graphQuery.isLoading && (!requiresSelection || hasSelectedVcs) && (
+        {!graphQuery.isLoading && (
           <div className="absolute bottom-3 left-3 right-3 z-10 space-y-2 md:bottom-4 md:left-4 md:right-auto">
             <div className="rounded-2xl border border-border bg-background px-4 py-2 shadow-sm text-xs md:rounded-full">
               <div className="flex items-center gap-3">
-                <span>
-                  {graph?.vcs.length ?? 0} {viewMode === "all" ? "visible VCs" : "selected VCs"}
-                </span>
-                <span>/</span>
-                <span>{viewMode === "all" ? "all mode" : "selected mode"}</span>
+                <span>{graph?.vcs.length ?? 0} visible VCs</span>
                 <span>/</span>
                 <span>{platformFilter === "all" ? "all connections" : `${platformFilter} only`}</span>
                 <span>/</span>
@@ -681,17 +649,17 @@ function GraphInner() {
             </div>
             {!hasEdges && (
               <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
-                All VCs and tracked people are visible, but there are no live signal connections between them yet.
+                Es gibt aktuell keine Graph-Knoten oder Kanten.
               </div>
             )}
-            {showingFallback && (
+            {usingEventConnections && (
               <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
-                No direct edges were found for your current watchlist, so Anytrace is temporarily showing valid legacy VC-follow connections while the live VC mapping catches up.
+                Snapshot observations are not populated for these edges yet, so the graph is temporarily bootstrapping from historical follow events.
               </div>
             )}
-            {!showingFallback && (graph?.orphanedEventCount ?? 0) > 0 && (
+            {!usingEventConnections && (graph?.filteredConnectionCount ?? 0) > 0 && (
               <div className="max-w-md rounded-2xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground shadow-sm">
-                {graph?.orphanedEventCount} event{graph?.orphanedEventCount === 1 ? "" : "s"} still point to deleted VC rows and were filtered out of the graph.
+                {graph?.filteredConnectionCount} snapshot connection{graph?.filteredConnectionCount === 1 ? "" : "s"} could not be matched to a visible VC or person yet and were filtered out.
               </div>
             )}
           </div>
@@ -701,9 +669,9 @@ function GraphInner() {
           <div className="absolute bottom-3 left-3 right-3 z-10 max-h-[42vh] overflow-y-auto rounded-[28px] border border-border bg-background p-5 shadow-xl md:bottom-4 md:left-auto md:right-4 md:w-[340px] md:max-w-[calc(100vw-2rem)]">
             {graphIsPartial && (
               <div className="mb-4 rounded-2xl bg-surface-sunken px-3 py-2 text-[11px] text-muted-foreground">
-                {showingFallback
-                  ? "This node is rendered from fallback graph data while live watchlist edges are being repaired."
-                  : "This node is partially backed by live data. Some orphaned VC events were filtered out."}
+                {usingEventConnections
+                  ? "This node is currently rendered from event-derived edges while snapshot observations are still catching up."
+                  : "Some snapshot connections could not be matched to a visible VC or tracked person and were filtered out."}
               </div>
             )}
             {selectedPerson && (
@@ -740,18 +708,7 @@ function GraphInner() {
                   {selectedPersonEvents.map((event) => (
                     <div key={event.id} className="rounded-2xl bg-surface-sunken px-3 py-2">
                       <div className="text-xs font-medium">{event.headline}</div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {event.eventType}
-                        {event.vcSourceId &&
-                        graph?.edges.some(
-                          (edge) =>
-                            edge.sourceId === event.vcSourceId &&
-                            edge.targetId === selectedPerson.id &&
-                            edge.graphSource === "fallback",
-                        )
-                          ? " / fallback edge"
-                          : ""}
-                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">{event.eventType}</div>
                     </div>
                   ))}
                 </div>
