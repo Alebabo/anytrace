@@ -139,8 +139,10 @@ export default function AppLayout() {
             </SheetContent>
           </Sheet>
 
-          <h1 className="text-sm font-medium text-muted-foreground truncate">{active?.label ?? "Anytrace"}</h1>
-          <AccessBadge />
+          <h1 className="min-w-0 flex-1 text-sm font-medium text-muted-foreground truncate md:flex-none">{active?.label ?? "Anytrace"}</h1>
+          <div className="hidden sm:block">
+            <AccessBadge />
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -165,6 +167,9 @@ export default function AppLayout() {
           </DropdownMenu>
         </header>
         <main className="flex-1 min-w-0">
+          <div className="border-b border-border bg-background px-3 py-2 sm:hidden">
+            <AccessBadge />
+          </div>
           <Outlet />
         </main>
       </div>

@@ -20,6 +20,7 @@ import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useAccessState, useGraphData, usePersonIdentities } from "@/hooks/useAnytrace";
 import type { ActivityPlatform, IdentityPlatform, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
@@ -252,6 +253,7 @@ function buildGraphLayout({
 function GraphInner() {
   const navigate = useNavigate();
   const reactFlow = useReactFlow();
+  const isMobile = useIsMobile();
   const { access } = useAccessState();
   const [viewMode, setViewMode] = useState<"selected" | "all">("selected");
   const graphQuery = useGraphData(access.isAuthenticated, viewMode);
@@ -264,7 +266,16 @@ function GraphInner() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const graph = graphQuery.data;
-  const identities = identitiesQuery.data ?? [];
+  const identities = useMemo(() => identitiesQuery.data ?? [], [identitiesQuery.data]);
+  const identitiesByPerson = useMemo(() => {
+    const grouped = new Map<string, PersonIdentity[]>();
+    for (const identity of identities) {
+      const list = grouped.get(identity.personId) ?? [];
+      list.push(identity);
+      grouped.set(identity.personId, list);
+    }
+    return grouped;
+  }, [identities]);
   const selectedPerson = graph?.people.find((person) => person.id === selectedNodeId) ?? null;
   const selectedVc = graph?.vcs.find((vc) => vc.id === selectedNodeId) ?? null;
   const selectedPersonIdentities = selectedPerson
@@ -381,10 +392,7 @@ function GraphInner() {
           highlight: topPickIds.has(person.id),
           dim: false,
           topPick: topPickIds.has(person.id),
-          imageUrls: avatarSourcesForPerson(
-            person,
-            identities.filter((identity) => identity.personId === person.id),
-          ),
+          imageUrls: avatarSourcesForPerson(person, identitiesByPerson.get(person.id) ?? []),
         },
       });
     });
@@ -392,8 +400,6 @@ function GraphInner() {
     filteredEdges.forEach((edge) => {
       const siblingIndex = siblingOrderByEdgeId.get(edge.id) ?? 0;
       const siblingCount = siblingCountBySource.get(edge.sourceId) ?? 1;
-      const centeredIndex = siblingIndex - (siblingCount - 1) / 2;
-      const isOuterConnection = !topPickIds.has(edge.targetId);
       const isSelectedConnection = !!activeNodeId && (edge.sourceId === activeNodeId || edge.targetId === activeNodeId);
       const dimUnselectedEdges = !!activeNodeId && !isSelectedConnection;
 
@@ -408,14 +414,14 @@ function GraphInner() {
         zIndex: edge.isTopPick ? 2 : 1,
         style: {
           stroke: platformColor(edge.platform),
-          strokeWidth: Math.min(4, Math.max(1.25, edge.eventCount * 1.3)),
+          strokeWidth: Math.min(4, Math.max(1.25, edge.eventCount * 1.3 + (siblingCount > 1 ? siblingIndex * 0.05 : 0))),
           opacity: dimUnselectedEdges ? 0.12 : edge.isTopPick ? 0.95 : 0.56,
         },
       });
     });
 
     return { nodes: [...vcNodes, ...personNodes], edges };
-  }, [graph, identities, platformFilter, positionOverrides, query, selectedNodeId, showOnlyTop]);
+  }, [graph, identitiesByPerson, platformFilter, positionOverrides, query, selectedNodeId, showOnlyTop]);
 
   const focusNode = useCallback(
     (nodeId: string) => {
@@ -430,11 +436,11 @@ function GraphInner() {
             : 48;
 
       reactFlow.setCenter(node.position.x + size / 2, node.position.y + size / 2, {
-        zoom: 0.82,
+        zoom: isMobile ? 0.68 : 0.82,
         duration: 500,
       });
     },
-    [built.nodes, reactFlow],
+    [built.nodes, isMobile, reactFlow],
   );
 
   const overviewPeople = useMemo(() => {
@@ -460,9 +466,9 @@ function GraphInner() {
       title="Graph"
       description="The Anytrace graph is now scoped to your selected VCs and only shows people with actual signal edges from those sources."
     >
-      <div className="relative h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] bg-surface-sunken/40">
-        <div className="absolute top-3 left-3 right-3 md:top-4 md:left-4 md:right-4 z-10 flex items-center justify-between gap-3 pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm w-full max-w-sm">
+      <div className="relative h-[calc(100vh-7rem)] overflow-hidden bg-surface-sunken/40 sm:h-[calc(100vh-6.5rem)] md:h-[calc(100vh-4rem)]">
+        <div className="absolute top-3 left-3 right-3 z-10 flex flex-col gap-3 pointer-events-none md:top-4 md:left-4 md:right-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="pointer-events-auto flex w-full items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm xl:max-w-sm">
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
             <Input
               value={query}
@@ -471,7 +477,7 @@ function GraphInner() {
               className="border-0 bg-transparent h-auto p-0 focus-visible:ring-0"
             />
           </div>
-          <div className="pointer-events-auto flex items-center gap-2">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2">
             <Button
               variant={showOnlyTop ? "default" : "outline"}
               size="sm"
@@ -497,7 +503,7 @@ function GraphInner() {
             >
               All VCs
             </Button>
-            <div className="hidden md:flex items-center gap-1 rounded-full border border-border bg-background p-1 shadow-sm">
+            <div className="flex w-full flex-wrap items-center gap-1 rounded-[20px] border border-border bg-background p-1 shadow-sm md:w-auto md:rounded-full">
               {([
                 ["all", "All"],
                 ["x", "X"],
@@ -515,7 +521,7 @@ function GraphInner() {
                 </Button>
               ))}
             </div>
-            <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
+            <div className="hidden xl:flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
               {showingFallback
                 ? "Fallback signal view"
@@ -526,7 +532,7 @@ function GraphInner() {
           </div>
         </div>
 
-        {!graphQuery.isLoading && hasRenderableNodes && (
+        {!graphQuery.isLoading && hasRenderableNodes && !isMobile && (
           <div
             className={`absolute left-3 top-16 bottom-3 z-10 pointer-events-auto transition-all duration-300 md:left-4 md:top-20 md:bottom-4 ${
               sidebarOpen ? "w-[320px]" : "w-12"
@@ -554,7 +560,7 @@ function GraphInner() {
 
                     <div className="mt-4 space-y-2 overflow-y-auto pr-1">
                       {overviewPeople.map((person) => {
-                        const personIdentities = identities.filter((identity) => identity.personId === person.id);
+                        const personIdentities = identitiesByPerson.get(person.id) ?? [];
                         const isSelected = selectedNodeId === person.id;
 
                         return (
@@ -657,8 +663,8 @@ function GraphInner() {
         )}
 
         {!graphQuery.isLoading && (!requiresSelection || hasSelectedVcs) && (
-          <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 z-10 space-y-2">
-            <div className="rounded-full border border-border bg-background px-4 py-2 shadow-sm text-xs">
+          <div className="absolute bottom-3 left-3 right-3 z-10 space-y-2 md:bottom-4 md:left-4 md:right-auto">
+            <div className="rounded-2xl border border-border bg-background px-4 py-2 shadow-sm text-xs md:rounded-full">
               <div className="flex items-center gap-3">
                 <span>
                   {graph?.vcs.length ?? 0} {viewMode === "all" ? "visible VCs" : "selected VCs"}
@@ -692,7 +698,7 @@ function GraphInner() {
         )}
 
         {!graphQuery.isLoading && (selectedPerson || selectedVc) && (
-          <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 z-10 w-[340px] max-w-[calc(100vw-1.5rem)] rounded-[28px] border border-border bg-background p-5 shadow-xl">
+          <div className="absolute bottom-3 left-3 right-3 z-10 max-h-[42vh] overflow-y-auto rounded-[28px] border border-border bg-background p-5 shadow-xl md:bottom-4 md:left-auto md:right-4 md:w-[340px] md:max-w-[calc(100vw-2rem)]">
             {graphIsPartial && (
               <div className="mb-4 rounded-2xl bg-surface-sunken px-3 py-2 text-[11px] text-muted-foreground">
                 {showingFallback
@@ -718,7 +724,7 @@ function GraphInner() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedNodeId(null)}>
+                  <Button variant="ghost" size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedNodeId(null)}>
                     Close
                   </Button>
                 </div>
@@ -770,7 +776,7 @@ function GraphInner() {
                       {selectedVc.sizeLabel ? ` / ${selectedVc.sizeLabel}` : ""}
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedNodeId(null)}>
+                  <Button variant="ghost" size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedNodeId(null)}>
                     Close
                   </Button>
                 </div>
@@ -796,7 +802,7 @@ function GraphInner() {
                         name={person.fullName}
                         imageUrls={avatarSourcesForPerson(
                           person,
-                          identities.filter((identity) => identity.personId === person.id),
+                          identitiesByPerson.get(person.id) ?? [],
                         )}
                         size={34}
                         rounded="xl"

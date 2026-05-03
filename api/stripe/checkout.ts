@@ -1,12 +1,12 @@
 import Stripe from "stripe";
 import { requireAuthenticatedUser } from "../_lib/auth.js";
 import { env, requireEnv } from "../_lib/env.js";
-import { readJsonBody, sendJson } from "../_lib/http.js";
+import { readJsonBody, sendJson, type ApiRequest, type ApiResponse } from "../_lib/http.js";
 import { getSiteUrlFromRequest } from "../_lib/supabase.js";
 
 const stripe = new Stripe(requireEnv("stripeSecretKey"));
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     return sendJson(res, 405, { ok: false, error: "Method not allowed." });
   }
@@ -17,8 +17,14 @@ export default async function handler(req: any, res: any) {
   try {
     const body = await readJsonBody(req);
     const siteUrl = getSiteUrlFromRequest(req);
-    const successUrl = body.successUrl || `${siteUrl}/settings?checkout=success`;
-    const cancelUrl = body.cancelUrl || `${siteUrl}/settings?checkout=canceled`;
+    const successUrl =
+      typeof body.successUrl === "string" && body.successUrl.trim()
+        ? body.successUrl
+        : `${siteUrl}/settings?checkout=success`;
+    const cancelUrl =
+      typeof body.cancelUrl === "string" && body.cancelUrl.trim()
+        ? body.cancelUrl
+        : `${siteUrl}/settings?checkout=canceled`;
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",

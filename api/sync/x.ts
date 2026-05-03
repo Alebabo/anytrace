@@ -1,8 +1,8 @@
 import { authorizeSyncRequest } from "../_lib/auth.js";
-import { sendJson } from "../_lib/http.js";
+import { sendJson, type ApiRequest, type ApiResponse } from "../_lib/http.js";
 import { syncXSignals } from "../_lib/x-sync.js";
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     return sendJson(res, 405, { ok: false, error: "Method not allowed." });
   }

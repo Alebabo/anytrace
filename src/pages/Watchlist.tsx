@@ -1,4 +1,5 @@
 import { Github, Linkedin, Trash2, Twitter } from "lucide-react";
+import { useMemo } from "react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -44,7 +45,7 @@ function SelectedVcRow({
   const { vcSource } = item;
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-4">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex items-center gap-3">
         <EntityAvatar name={vcSource.name} imageUrls={avatarSourcesForVc(vcSource)} size={40} />
         <div className="min-w-0">
@@ -56,7 +57,7 @@ function SelectedVcRow({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
         <div className="flex items-center gap-2 text-muted-foreground">
           {vcSource.twitterUrl && (
             <a href={vcSource.twitterUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
@@ -102,7 +103,7 @@ function SelectedGithubRow({
   const linkedin = identityFor(person.identities, "linkedin");
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-4">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex items-center gap-3">
         <EntityAvatar
           name={person.fullName}
@@ -122,7 +123,7 @@ function SelectedGithubRow({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
         <div className="flex items-center gap-2 text-muted-foreground">
           {x && (
             <a href={x.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
@@ -164,30 +165,33 @@ export default function WatchlistPage() {
   const watchlist = watchlistQuery.data;
   const selectedVcs = watchlist?.selectedVcs ?? [];
   const selectedGithubPeople = watchlist?.people ?? [];
-  const identities = identitiesQuery.data ?? [];
+  const openCards = useMemo(
+    () => Number(selectedVcs.length > 0) + Number(selectedGithubPeople.length > 0),
+    [selectedGithubPeople.length, selectedVcs.length],
+  );
 
   return (
     <ProductGate
       title="Watchlist"
       description="Keep the page compact by expanding only the watchlist blocks you want to inspect."
     >
-      <div className="px-4 md:px-8 py-10 max-w-6xl mx-auto">
-        <div className="flex items-end justify-between gap-6 mb-10 flex-wrap">
+      <div className="max-w-6xl mx-auto overflow-x-hidden px-4 py-8 md:px-8 md:py-10">
+        <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:flex-wrap md:items-end md:justify-between">
           <div>
-            <h2 className="font-serif text-5xl leading-[1.05]">Watchlist</h2>
+            <h2 className="font-serif text-4xl leading-[1.05] md:text-5xl">Watchlist</h2>
             <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
               Expand the venture or people watchlist only when you need the full list. The page stays compact by default.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Stat label="Selected VCs" value={selectedVcs.length} />
             <Stat label="Git people" value={selectedGithubPeople.length} />
-            <Stat label="Open cards" value={2} />
+            <Stat label="Open cards" value={openCards} />
           </div>
         </div>
 
         <div className="grid gap-8">
-          <Card className="rounded-[28px] border-border px-6 py-3 shadow-none">
+          <Card className="overflow-hidden rounded-[28px] border-border px-6 py-3 shadow-none">
             <Accordion type="multiple" defaultValue={["selected-vcs", "selected-git-people"]} className="w-full">
               <AccordionItem value="selected-vcs" className="border-border">
                 <AccordionTrigger className="py-5 text-left hover:no-underline">

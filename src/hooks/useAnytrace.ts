@@ -102,13 +102,22 @@ function normalizeTwitterInput(input: string) {
     try {
       const parsed = new URL(trimmed);
       const handle = parsed.pathname.split("/").filter(Boolean).at(-1)?.replace(/^@/, "") ?? "";
+      if (!handle) {
+        return { handle: "", url: "" };
+      }
       return {
         handle: handle.toLowerCase(),
         url: `https://twitter.com/${handle}`,
       };
     } catch {
+      if (!withoutAt) {
+        return { handle: "", url: "" };
+      }
       return { handle: withoutAt.toLowerCase(), url: `https://twitter.com/${withoutAt}` };
     }
+  }
+  if (!withoutAt) {
+    return { handle: "", url: "" };
   }
   return {
     handle: withoutAt.toLowerCase(),
@@ -315,7 +324,7 @@ function computeAccessState(subscription: SubRow | null, session: Session | null
   }
 
   const now = Date.now();
-  const trialEnds = new Date(subscription.trial_ends_at).getTime();
+  const trialEnds = subscription.trial_ends_at ? new Date(subscription.trial_ends_at).getTime() : Number.NaN;
   const daysLeft = Number.isFinite(trialEnds)
     ? Math.max(0, Math.ceil((trialEnds - now) / 86_400_000))
     : null;
@@ -327,7 +336,7 @@ function computeAccessState(subscription: SubRow | null, session: Session | null
     canAccessProduct: isActive || trialValid,
     requiresPayment: !isActive && !trialValid,
     status: subscription.status,
-    trialEndsAt: subscription.trial_ends_at,
+    trialEndsAt: subscription.trial_ends_at ?? null,
     daysLeftInTrial: daysLeft,
   };
 }
@@ -398,6 +407,7 @@ export function useDemoMode() {
   const [demoMode, setDemoMode] = useState(readDemoMode);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const sync = () => setDemoMode(readDemoMode());
     window.addEventListener("storage", sync);
     window.addEventListener(DEMO_MODE_EVENT, sync);
@@ -945,25 +955,31 @@ export function useWatchlist(enabled = true) {
         list.push(identity);
         identitiesByPerson.set(identity.personId, list);
       }
+      const eventsByPerson = new Map<string, ActivityEvent[]>();
+      for (const event of eventsQuery.data) {
+        const list = eventsByPerson.get(event.personId) ?? [];
+        list.push(event);
+        eventsByPerson.set(event.personId, list);
+      }
 
       const people = peopleQuery.data
         .filter((person) => selectedGithubIds.has(person.id))
         .map<WatchlistPerson>((person) => {
-        const personEvents = eventsQuery.data.filter((event) => event.personId === person.id);
-        return {
-          ...person,
-          identities: identitiesByPerson.get(person.id) ?? [],
-          signalsThisWeek: personEvents.length,
-          vcFollowersThisWeek: personEvents.filter((event) => event.eventType === "vc_follow").length,
-          githubMomentum: personEvents
-            .filter((event) => event.eventType === "repo_traction")
-            .reduce((sum, event) => sum + Number(event.metadata.weekly_star_delta ?? 0), 0),
-          bigTechExit: personEvents.some((event) => event.eventType === "big_tech_exit"),
-          importantGithubFollowers: personEvents
-            .filter((event) => event.eventType === "important_github_follower")
-            .reduce((sum, event) => sum + Number(event.metadata.follower_count ?? 1), 0),
-        };
-      });
+          const personEvents = eventsByPerson.get(person.id) ?? [];
+          return {
+            ...person,
+            identities: identitiesByPerson.get(person.id) ?? [],
+            signalsThisWeek: personEvents.length,
+            vcFollowersThisWeek: personEvents.filter((event) => event.eventType === "vc_follow").length,
+            githubMomentum: personEvents
+              .filter((event) => event.eventType === "repo_traction")
+              .reduce((sum, event) => sum + Number(event.metadata.weekly_star_delta ?? 0), 0),
+            bigTechExit: personEvents.some((event) => event.eventType === "big_tech_exit"),
+            importantGithubFollowers: personEvents
+              .filter((event) => event.eventType === "important_github_follower")
+              .reduce((sum, event) => sum + Number(event.metadata.follower_count ?? 1), 0),
+          };
+        });
 
       return {
         selectedVcs: selectedVcsQuery.data ?? [],

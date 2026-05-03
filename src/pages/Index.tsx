@@ -82,9 +82,9 @@ function PickCard({
           onToggle();
         }
       }}
-      className="w-full text-left rounded-[28px] border border-border bg-card p-5 md:p-6 shadow-sm transition-colors hover:border-foreground/20"
+      className="w-full overflow-hidden rounded-[28px] border border-border bg-card p-5 text-left shadow-sm transition-colors hover:border-foreground/20 md:p-6"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3 sm:gap-4">
         <div className="w-8 text-[11px] font-mono text-muted-foreground tabular-nums pt-1">
           {String(pick.rank).padStart(2, "0")}
         </div>
@@ -95,15 +95,15 @@ function PickCard({
           rounded="xl"
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h3 className="text-xl font-medium leading-tight">{pick.person.fullName}</h3>
+              <h3 className="text-xl font-medium leading-tight break-words">{pick.person.fullName}</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 {pick.person.roleTitle}
                 {pick.person.company ? ` / ${pick.person.company}` : ""}
               </p>
             </div>
-            <div className="text-right shrink-0">
+            <div className="shrink-0 text-left sm:text-right">
               <div className="font-serif text-4xl leading-none tabular-nums">{pick.score}</div>
               <div className="text-[11px] text-muted-foreground mt-1">Weekly score</div>
             </div>
@@ -148,15 +148,15 @@ function PickCard({
             </div>
           )}
 
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{pick.vcFollowCount} VC follows</span>
               <span>/</span>
               <span>{pick.githubAttentionScore} GitHub delta</span>
               <span>/</span>
               <span>{pick.person.location}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {linkedin && (
                 <a href={linkedin.profileUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="text-muted-foreground hover:text-signal-linkedin">
                   <Linkedin className="h-4 w-4" />
@@ -172,7 +172,7 @@ function PickCard({
                   <Github className="h-4 w-4" />
                 </a>
               )}
-              <Button asChild size="sm" variant="outline" className="rounded-full ml-2">
+              <Button asChild size="sm" variant="outline" className="rounded-full sm:ml-2">
                 <Link to={`/connections/${pick.person.id}`}>
                   Details <ArrowUpRight className="h-3.5 w-3.5" />
                 </Link>
@@ -191,12 +191,30 @@ export default function MainDashboard() {
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const eventsQuery = useActivityEvents(access.isAuthenticated);
   const vcsQuery = useVcSources(access.isAuthenticated);
-  const identities = identitiesQuery.data ?? [];
-  const events = eventsQuery.data ?? [];
+  const identities = useMemo(() => identitiesQuery.data ?? [], [identitiesQuery.data]);
+  const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
   const vcsById = useMemo(
     () => new Map((vcsQuery.data ?? []).map((vc) => [vc.id, vc])),
     [vcsQuery.data],
   );
+  const evidenceByPerson = useMemo(() => {
+    const grouped = new Map<string, ActivityEvent[]>();
+    for (const event of events) {
+      const list = grouped.get(event.personId) ?? [];
+      list.push(event);
+      grouped.set(event.personId, list);
+    }
+    return grouped;
+  }, [events]);
+  const identitiesByPerson = useMemo(() => {
+    const grouped = new Map<string, PersonIdentity[]>();
+    for (const identity of identities) {
+      const list = grouped.get(identity.personId) ?? [];
+      list.push(identity);
+      grouped.set(identity.personId, list);
+    }
+    return grouped;
+  }, [identities]);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
 
   return (
@@ -204,17 +222,17 @@ export default function MainDashboard() {
       title="Main"
       description="Weekly top picks for venture teams: the people drawing fresh attention from a curated European VC set."
     >
-      <div className="px-4 md:px-10 py-10 max-w-6xl mx-auto">
-        <div className="flex items-end justify-between gap-6 mb-10 flex-wrap">
+      <div className="max-w-6xl mx-auto px-4 py-8 md:px-10 md:py-10">
+        <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:flex-wrap md:items-end md:justify-between">
           <div>
-            <h2 className="font-serif text-5xl leading-[1.02] text-balance">
+            <h2 className="font-serif text-4xl leading-[1.02] text-balance md:text-5xl">
               Top picks <span className="text-muted-foreground">this week</span>
             </h2>
             <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
               Ranked primarily by VC attention, then sharpened with big-tech exits and GitHub traction. The product surface is lighter now, but the Anytrace signal logic stays evidence-first.
             </p>
           </div>
-          <div className="rounded-2xl border border-border bg-surface-sunken px-4 py-3">
+          <div className="rounded-2xl border border-border bg-surface-sunken px-4 py-3 md:max-w-sm">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Rule in force</div>
             <div className="text-sm mt-1">3 VC follows within 7 days qualifies a person as top-pick ready.</div>
           </div>
@@ -236,9 +254,9 @@ export default function MainDashboard() {
               <PickCard
                 key={pick.id}
                 pick={pick}
-                identities={identities.filter((identity) => identity.personId === pick.person.id)}
-                evidence={events
-                  .filter((event) => event.personId === pick.person.id)
+                identities={identitiesByPerson.get(pick.person.id) ?? []}
+                evidence={(evidenceByPerson.get(pick.person.id) ?? [])
+                  .slice()
                   .sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime())
                   .slice(0, 5)}
                 expanded={expandedPersonId === pick.person.id}

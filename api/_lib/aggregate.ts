@@ -1,6 +1,37 @@
 import { supabaseAdmin } from "./supabase.js";
 import { daysAgoIso, isoWeekStart } from "./time.js";
 
+type XSignalRow = {
+  id: string;
+  metadata: Record<string, unknown> | null;
+  person_id: string;
+  vc_id: string | null;
+};
+
+type GithubSignalRow = {
+  id: string;
+  metadata: Record<string, unknown> | null;
+  person_id: string;
+  repo_full_name: string | null;
+  repo_url: string | null;
+  stars_delta: number | null;
+};
+
+type LinkedinEventRow = {
+  headline: string;
+  id: string;
+  person_id: string;
+};
+
+type ScoreBucket = {
+  person_id: string;
+  vcIds: Set<string>;
+  githubSignals: GithubSignalRow[];
+  linkedinMentions: LinkedinEventRow[];
+  signalIds: string[];
+  highConfidence: boolean;
+};
+
 export async function recomputeWeeklyTopPicks() {
   const windowStart = daysAgoIso(7);
   const weekStart = isoWeekStart();
@@ -28,15 +59,15 @@ export async function recomputeWeeklyTopPicks() {
   if (ghError) throw ghError;
   if (linkedinError) throw linkedinError;
 
-  const scoreMap = new Map<string, any>();
+  const scoreMap = new Map<string, ScoreBucket>();
   const takeBucket = (personId: string) => {
     const existing = scoreMap.get(personId);
     if (existing) return existing;
     const next = {
       person_id: personId,
       vcIds: new Set<string>(),
-      githubSignals: [] as any[],
-      linkedinMentions: [] as any[],
+      githubSignals: [] as GithubSignalRow[],
+      linkedinMentions: [] as LinkedinEventRow[],
       signalIds: [] as string[],
       highConfidence: false,
     };
@@ -44,21 +75,21 @@ export async function recomputeWeeklyTopPicks() {
     return next;
   };
 
-  for (const signal of xSignals ?? []) {
+  for (const signal of (xSignals ?? []) as XSignalRow[]) {
     const bucket = takeBucket(signal.person_id);
     if (signal.vc_id) bucket.vcIds.add(signal.vc_id);
     bucket.signalIds.push(signal.id);
     if (signal.metadata?.high_confidence === true) bucket.highConfidence = true;
   }
 
-  for (const signal of githubSignals ?? []) {
+  for (const signal of (githubSignals ?? []) as GithubSignalRow[]) {
     const bucket = takeBucket(signal.person_id);
     bucket.githubSignals.push(signal);
     bucket.signalIds.push(signal.id);
     if (signal.metadata?.high_confidence === true) bucket.highConfidence = true;
   }
 
-  for (const event of linkedinEvents ?? []) {
+  for (const event of (linkedinEvents ?? []) as LinkedinEventRow[]) {
     const bucket = takeBucket(event.person_id);
     bucket.linkedinMentions.push(event);
     bucket.signalIds.push(event.id);
@@ -77,7 +108,7 @@ export async function recomputeWeeklyTopPicks() {
         score: vcFollowCount * 3 + (hasViralRepo ? 2 : 0) + (linkedinMentionCount > 0 ? 1 : 0),
         evidence: {
           signal_ids: bucket.signalIds,
-          github_repos: bucket.githubSignals.map((signal: any) => ({
+          github_repos: bucket.githubSignals.map((signal) => ({
             repo_url: signal.repo_url,
             repo_full_name: signal.repo_full_name,
             stars_delta: signal.stars_delta,

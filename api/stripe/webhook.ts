@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { requireEnv } from "../_lib/env.js";
-import { readRawBody, sendJson } from "../_lib/http.js";
+import { readRawBody, sendJson, type ApiRequest, type ApiResponse } from "../_lib/http.js";
 import { setUserProState, supabaseAdmin } from "../_lib/supabase.js";
 
 const stripe = new Stripe(requireEnv("stripeSecretKey"));
@@ -44,7 +44,7 @@ export const config = {
   },
 };
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     return sendJson(res, 405, { ok: false, error: "Method not allowed." });
   }

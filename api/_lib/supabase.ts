@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { env, requireEnv } from "./env.js";
+import type { ApiRequest } from "./http.js";
 
 export const supabaseAdmin = createClient(
   requireEnv("supabaseUrl"),
@@ -45,7 +46,7 @@ export async function setUserProState(userId: string, isPro: boolean) {
   if (authError) throw authError;
 }
 
-export function getSiteUrlFromRequest(req: any) {
+export function getSiteUrlFromRequest(req: ApiRequest) {
   const forwardedHost = req.headers["x-forwarded-host"];
   const host = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost ?? req.headers.host;
   const protoHeader = req.headers["x-forwarded-proto"];
@@ -54,6 +55,10 @@ export function getSiteUrlFromRequest(req: any) {
   if (env.siteUrl) {
     if (env.siteUrl.startsWith("http")) return env.siteUrl;
     return `https://${env.siteUrl}`;
+  }
+
+  if (!host || typeof host !== "string") {
+    return "http://localhost:3000";
   }
 
   return `${protocol}://${host}`;

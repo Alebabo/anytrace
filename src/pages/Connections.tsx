@@ -40,7 +40,7 @@ export default function ConnectionDetail() {
 
   return (
     <ProductGate>
-      <div className="px-4 md:px-8 py-10 max-w-5xl mx-auto">
+      <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 md:py-10">
         <Button asChild variant="ghost" className="-ml-2 mb-4 gap-1.5 text-muted-foreground">
           <Link to="/graph">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to graph
@@ -59,7 +59,7 @@ export default function ConnectionDetail() {
         ) : (
           <>
             <div className="rounded-[28px] border border-border bg-card p-6 md:p-8 shadow-sm">
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <EntityAvatar
                   name={person.fullName}
                   imageUrls={avatarSourcesForPerson(person, identities)}
@@ -67,14 +67,14 @@ export default function ConnectionDetail() {
                   rounded="xl"
                 />
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-serif text-4xl leading-tight">{person.fullName}</h2>
+                  <h2 className="font-serif text-3xl leading-tight md:text-4xl">{person.fullName}</h2>
                   <p className="text-sm text-muted-foreground mt-2">
                     {person.roleTitle}
                     {person.company ? ` / ${person.company}` : ""}
                     {person.location ? ` / ${person.location}` : ""}
                   </p>
                   <p className="text-sm mt-4 max-w-3xl leading-relaxed">{person.summary}</p>
-                  <div className="flex items-center gap-3 mt-5 text-muted-foreground">
+                  <div className="mt-5 flex flex-wrap items-center gap-3 text-muted-foreground">
                     {linkedin && (
                       <a href={linkedin.profileUrl} target="_blank" rel="noreferrer" className="hover:text-signal-linkedin">
                         <Linkedin className="h-4 w-4" />
@@ -129,9 +129,11 @@ export default function ConnectionDetail() {
                             )}
                           </div>
                         </div>
-                        <a href={event.sourceUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground shrink-0">
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                        {event.sourceUrl ? (
+                          <a href={event.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : null}
                       </div>
                     </li>
                   );

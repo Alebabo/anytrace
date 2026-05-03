@@ -1,8 +1,8 @@
 import { env } from "./env.js";
-import { getBearerToken, sendJson } from "./http.js";
+import { getBearerToken, sendJson, type ApiRequest, type ApiResponse } from "./http.js";
 import { getAuthenticatedUser } from "./supabase.js";
 
-export async function requireAuthenticatedUser(req: any, res: any) {
+export async function requireAuthenticatedUser(req: ApiRequest, res: ApiResponse) {
   const token = getBearerToken(req);
   if (!token) {
     sendJson(res, 401, { ok: false, error: "Missing bearer token." });
@@ -18,7 +18,7 @@ export async function requireAuthenticatedUser(req: any, res: any) {
   }
 }
 
-export async function authorizeSyncRequest(req: any, res: any) {
+export async function authorizeSyncRequest(req: ApiRequest, res: ApiResponse) {
   const cronHeader = req.headers["x-vercel-cron"];
   if (cronHeader) {
     return { kind: "cron" as const };
@@ -34,7 +34,7 @@ export async function authorizeSyncRequest(req: any, res: any) {
   return { kind: "user" as const, user: auth.user };
 }
 
-export function getUserEntitlements(user: any) {
+export function getUserEntitlements(user: { app_metadata?: Record<string, unknown> } | null | undefined) {
   return {
     isPro: user?.app_metadata?.is_pro === true,
   };
