@@ -1,31 +1,27 @@
 # Anytrace
 
-Anytrace is currently a frontend-only shell.
+Anytrace is a Vite frontend that reads VC data from Supabase and can trigger an external X scraper endpoint.
 
-The previous backend has been removed, including:
+## Frontend env
 
-- Supabase integration
-- Vercel API routes
-- auth and billing flow
-- sync endpoints
-- seeded, demo, and fallback data
+Create a `.env` with:
+
+```bash
+VITE_SITE_URL=http://localhost:8080
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+VITE_TWITTER_SCRAPE_URL=...
+```
 
 ## Local development
 
-1. Install dependencies
-
 ```bash
 npm install
-```
-
-2. Start the app
-
-```bash
 npm run dev
 ```
 
-## Current state
+## Deployment shape
 
-- Pages and UI components remain available as a visual base.
-- Data-driven sections intentionally render empty states.
-- The repository is ready for a fresh Supabase setup and a new application model.
+- Vercel deploys only the frontend.
+- The X scrape button calls an external backend URL from `VITE_TWITTER_SCRAPE_URL`.
+- Supabase is queried directly from the browser via the anon key.

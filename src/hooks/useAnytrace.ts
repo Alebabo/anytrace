@@ -58,6 +58,10 @@ function useStaticMutation<TInput = void, TOutput = void>(handler: (input: TInpu
   });
 }
 
+function getTwitterScrapeEndpoint() {
+  return import.meta.env.VITE_TWITTER_SCRAPE_URL?.trim() || "";
+}
+
 export function useSession() {
   return {
     session: FRONTEND_ONLY_SESSION,
@@ -109,8 +113,16 @@ export function useManualSync() {
 
 export function useRunTwitterScrape() {
   return useStaticMutation(async () => {
-    const response = await fetch("/api/run-twitter", {
+    const endpoint = getTwitterScrapeEndpoint();
+    if (!endpoint) {
+      throw new Error("Twitter scrape endpoint missing. Set VITE_TWITTER_SCRAPE_URL.");
+    }
+
+    const response = await fetch(endpoint, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
 
     const payload = (await response.json()) as {
@@ -133,6 +145,10 @@ export function useRunTwitterScrape() {
 
     return payload;
   });
+}
+
+export function useTwitterScrapeEndpoint() {
+  return getTwitterScrapeEndpoint();
 }
 
 export function useVcSources(_enabled = true) {

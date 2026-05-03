@@ -1,5 +1,5 @@
 import { DatabaseZap, Layers3, Loader2, PlayCircle, ShieldOff, Trash2 } from "lucide-react";
-import { useRunTwitterScrape } from "@/hooks/useAnytrace";
+import { useRunTwitterScrape, useTwitterScrapeEndpoint } from "@/hooks/useAnytrace";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -25,6 +25,7 @@ function InfoRow({
 
 export default function SettingsPage() {
   const runTwitterScrape = useRunTwitterScrape();
+  const twitterScrapeEndpoint = useTwitterScrapeEndpoint();
   const lastRun = runTwitterScrape.data;
 
   return (
@@ -32,17 +33,17 @@ export default function SettingsPage() {
       <div className="mb-10">
         <h2 className="font-serif text-5xl leading-[1.05]">Settings</h2>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Hier kannst du den aktuellen Projektzustand sehen und den X-Scrape manuell aus dem Frontend starten.
+          Hier kannst du den aktuellen Projektzustand sehen und den X-Scrape aus dem Frontend anstoßen.
         </p>
       </div>
 
       <div className="grid gap-4">
         <Card className="rounded-[28px] border-border p-6 shadow-none">
           <h3 className="mb-4 text-base font-medium">Current state</h3>
-          <InfoRow icon={DatabaseZap} label="Backend" value="Python backend aktiv" />
+          <InfoRow icon={DatabaseZap} label="Backend" value="External scraper endpoint" />
           <InfoRow icon={ShieldOff} label="Auth" value="Noch nicht verdrahtet" />
           <InfoRow icon={Trash2} label="Fallback data" value="Entfernt" />
-          <InfoRow icon={Layers3} label="Frontend mode" value="Supabase + manual triggers" />
+          <InfoRow icon={Layers3} label="Frontend mode" value="Supabase + external scraper trigger" />
         </Card>
 
         <Card className="rounded-[28px] border-border p-6 shadow-none">
@@ -50,14 +51,16 @@ export default function SettingsPage() {
             <div className="max-w-2xl">
               <h3 className="text-base font-medium">Manual X scrape</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Startet den Python-Scraper per `POST /api/run-twitter` und verarbeitet alle VCs mit hinterlegtem
-                `twitter_handle`.
+                Startet deinen externen Python-Scraper per `POST` auf die in `VITE_TWITTER_SCRAPE_URL` konfigurierte URL.
+              </p>
+              <p className="mt-2 break-all text-xs text-muted-foreground">
+                Endpoint: {twitterScrapeEndpoint || "nicht konfiguriert"}
               </p>
             </div>
             <Button
               type="button"
               onClick={() => runTwitterScrape.mutate()}
-              disabled={runTwitterScrape.isPending}
+              disabled={runTwitterScrape.isPending || !twitterScrapeEndpoint}
               className="rounded-full"
             >
               {runTwitterScrape.isPending ? (
@@ -73,6 +76,12 @@ export default function SettingsPage() {
               )}
             </Button>
           </div>
+
+          {!twitterScrapeEndpoint && (
+            <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
+              Setze `VITE_TWITTER_SCRAPE_URL`, damit der Button einen externen Scraper triggern kann.
+            </div>
+          )}
 
           {runTwitterScrape.isError && (
             <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -90,8 +99,7 @@ export default function SettingsPage() {
                   <div key={result.vc_name} className="rounded-2xl bg-background px-4 py-3 text-sm">
                     <div className="font-medium">{result.vc_name}</div>
                     <div className="mt-1 text-muted-foreground">
-                      {result.new_snapshot_count} neue Handles / {result.matched_candidate_count} Candidate-Matches /{" "}
-                      {result.stopped_early ? "Early stop" : "Full pass"}
+                      {result.new_snapshot_count} neue Handles / {result.matched_candidate_count} Candidate-Matches / {result.stopped_early ? "Early stop" : "Full pass"}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       {result.baseline_run ? "Baseline run" : "Incremental run"} / {result.output_file}
