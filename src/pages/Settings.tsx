@@ -107,7 +107,7 @@ export default function SettingsPage() {
               <div className="mt-5 flex flex-wrap gap-3">
                 <Button
                   className="rounded-full"
-                  disabled={manualSync.isPending || demoMode}
+                  disabled={manualSync.isPending}
                   onClick={() => runSync("all", "Full sync")}
                 >
                   Run full sync
@@ -115,7 +115,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   className="rounded-full"
-                  disabled={manualSync.isPending || demoMode}
+                  disabled={manualSync.isPending}
                   onClick={() => runSync("x", "X sync")}
                 >
                   Sync X
@@ -123,7 +123,7 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   className="rounded-full"
-                  disabled={manualSync.isPending || demoMode}
+                  disabled={manualSync.isPending}
                   onClick={() => runSync("github", "GitHub sync")}
                 >
                   Sync GitHub
@@ -131,17 +131,17 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   className="rounded-full"
-                  disabled={manualSync.isPending || demoMode}
+                  disabled={manualSync.isPending}
                   onClick={() => runSync("media-backfill", "Media backfill")}
                 >
                   Run media backfill
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-4">
-                {demoMode
-                  ? "Manual sync is disabled in demo mode."
-                  : manualSync.isPending
-                    ? "Sync in progress..."
+                {manualSync.isPending
+                  ? "Sync in progress..."
+                  : demoMode
+                    ? "Demo mode runs a local test sync so you can exercise the full UI."
                     : "No automatic schedule is configured in Vercel."}
               </p>
             </div>

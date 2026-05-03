@@ -184,6 +184,42 @@ function linkedinProfileUrl(handle: string) {
   return handle.startsWith("http") ? handle : `https://www.linkedin.com/in/${handle}/`;
 }
 
+function markDemoSync(target: "x" | "github" | "media-backfill" | "all") {
+  const now = new Date().toISOString();
+
+  if (target === "x" || target === "all" || target === "github") {
+    const selectedIds = new Set(readDemoSelectedVcIds());
+    const nextCatalog = readDemoVcCatalog().map((vc) => {
+      if (!selectedIds.has(vc.id)) return vc;
+
+      if (target === "x" || target === "all") {
+        return {
+          ...vc,
+          syncStatus: "ok" as const,
+          lastXSyncAt: now,
+          lastSyncError: null,
+        };
+      }
+
+      return {
+        ...vc,
+        syncStatus: "ok" as const,
+        lastGithubSyncAt: now,
+        lastSyncError: null,
+      };
+    });
+
+    writeDemoVcCatalog(nextCatalog);
+  }
+
+  return {
+    ok: true,
+    mode: "demo",
+    target,
+    syncedAt: now,
+  };
+}
+
 function mapVc(row: VcRow): VcSource {
   return {
     id: row.id,
@@ -492,7 +528,15 @@ export function useManualSync() {
   return useMutation({
     mutationFn: async (target: "x" | "github" | "media-backfill" | "all") => {
       if (demoMode) {
-        throw new Error("Manual sync is unavailable in demo mode.");
+        if (target === "all") {
+          return {
+            x: markDemoSync("x"),
+            github: markDemoSync("github"),
+            mediaBackfill: markDemoSync("media-backfill"),
+          };
+        }
+
+        return markDemoSync(target);
       }
 
       if (target === "all") {
@@ -514,6 +558,7 @@ export function useManualSync() {
       qc.invalidateQueries({ queryKey: ["person-identities"] });
       qc.invalidateQueries({ queryKey: ["activity-events"] });
       qc.invalidateQueries({ queryKey: ["selected-vc-watchlist"] });
+      qc.invalidateQueries({ queryKey: ["subscription"] });
       qc.invalidateQueries({ queryKey: ["graph-data"] });
     },
   });
