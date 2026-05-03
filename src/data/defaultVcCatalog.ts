@@ -50,7 +50,7 @@ export const defaultVcCatalog = [
     country: "Deutschland",
     sizeLabel: "klein",
     sectorFocus: "Pre-Seed/Seed, digitale Start-ups, SaaS, Marktplaetze",
-    twitterUrl: "https://twitter.com/joergrheinboldt",
+    twitterUrl: "",
     linkedinUrl: "https://www.linkedin.com/company/apxberlin/",
   },
   {
@@ -68,7 +68,7 @@ export const defaultVcCatalog = [
     country: "Deutschland",
     sizeLabel: "klein",
     sectorFocus: "Early Stage, Digital Tech, Marktplaetze, B2C/B2B",
-    twitterUrl: "https://twitter.com/hartmann_p",
+    twitterUrl: "",
     linkedinUrl: "https://www.linkedin.com/company/rheingau-founders/",
   },
   {
@@ -86,7 +86,7 @@ export const defaultVcCatalog = [
     country: "Deutschland",
     sizeLabel: "klein",
     sectorFocus: "Fruehphase, skalierbare Geschaeftsmodelle, Fintech, SaaS",
-    twitterUrl: "https://twitter.com/picuscapital",
+    twitterUrl: "",
     linkedinUrl: "https://www.linkedin.com/company/picus-capital/",
   },
   {
@@ -95,7 +95,7 @@ export const defaultVcCatalog = [
     country: "Spanien/Frankreich",
     sizeLabel: "klein",
     sectorFocus: "Pre-Seed, B2B & B2C, opportunistische Tech-Deals, Fokus Sued- und Frankreich",
-    twitterUrl: "https://twitter.com/oscarpierre",
+    twitterUrl: "",
     linkedinUrl: "https://www.linkedin.com/company/yellow.vc/",
   },
 ] as const;

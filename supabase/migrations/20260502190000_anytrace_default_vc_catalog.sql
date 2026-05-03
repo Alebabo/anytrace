@@ -19,12 +19,12 @@ with new_seed_data (slug, name, country, size_label, sector_focus, twitter_url, 
     ('earlybird-venture-capital', 'Earlybird Venture Capital', 'Deutschland', 'gross', 'Tech, B2B/B2C, Fintech, Marktplaetze', 'https://twitter.com/EarlybirdVC', 'https://www.linkedin.com/company/earlybird-venture-capital/'),
     ('hv-capital', 'HV Capital', 'Deutschland', 'gross', 'Digital Tech, E-Commerce, Fintech', 'https://twitter.com/hvcapital', 'https://www.linkedin.com/company/hvcapital/'),
     ('project-a-ventures', 'Project A Ventures', 'Deutschland', 'mittel/gross', 'Digital Tech, Fintech, E-Commerce, SaaS', 'https://twitter.com/fheinemann', 'https://www.linkedin.com/company/project-a-vc/'),
-    ('apx', 'APX', 'Deutschland', 'klein', 'Pre-Seed/Seed, digitale Start-ups, SaaS, Marktplaetze', 'https://twitter.com/joergrheinboldt', 'https://www.linkedin.com/company/apxberlin/'),
+    ('apx', 'APX', 'Deutschland', 'klein', 'Pre-Seed/Seed, digitale Start-ups, SaaS, Marktplaetze', null, 'https://www.linkedin.com/company/apxberlin/'),
     ('fly-ventures', 'Fly Ventures', 'Deutschland', 'klein', 'Fruehphase, B2B-Software, Deep Tech, AI', 'https://twitter.com/flyvc', 'https://www.linkedin.com/company/fly-ventures/'),
-    ('rheingau-founders', 'Rheingau Founders', 'Deutschland', 'klein', 'Early Stage, Digital Tech, Marktplaetze, B2C/B2B', 'https://twitter.com/hartmann_p', 'https://www.linkedin.com/company/rheingau-founders/'),
+    ('rheingau-founders', 'Rheingau Founders', 'Deutschland', 'klein', 'Early Stage, Digital Tech, Marktplaetze, B2C/B2B', null, 'https://www.linkedin.com/company/rheingau-founders/'),
     ('high-tech-grunderfonds-htgf', 'High-Tech Gruenderfonds (HTGF)', 'Deutschland', 'klein', 'Seed, Tech-Start-ups, Industrial Tech, Digital Tech, Life Sciences', 'https://twitter.com/htgf', 'https://www.linkedin.com/company/high-tech-gruenderfonds/'),
-    ('picus-capital', 'Picus Capital', 'Deutschland', 'klein', 'Fruehphase, skalierbare Geschaeftsmodelle, Fintech, SaaS', 'https://twitter.com/picuscapital', 'https://www.linkedin.com/company/picus-capital/'),
-    ('yellow-vc', 'Yellow.vc', 'Spanien/Frankreich', 'klein', 'Pre-Seed, B2B & B2C, opportunistische Tech-Deals, Fokus Sued- und Frankreich', 'https://twitter.com/oscarpierre', 'https://www.linkedin.com/company/yellow.vc/')
+    ('picus-capital', 'Picus Capital', 'Deutschland', 'klein', 'Fruehphase, skalierbare Geschaeftsmodelle, Fintech, SaaS', null, 'https://www.linkedin.com/company/picus-capital/'),
+    ('yellow-vc', 'Yellow.vc', 'Spanien/Frankreich', 'klein', 'Pre-Seed, B2B & B2C, opportunistische Tech-Deals, Fokus Sued- und Frankreich', null, 'https://www.linkedin.com/company/yellow.vc/')
 ),
 upserted as (
   insert into public.vc_sources (
@@ -55,7 +55,10 @@ upserted as (
     'Europe',
     country,
     '',
-    regexp_replace(twitter_url, '^https?://((www\\.)?twitter\\.com|x\\.com)/', ''),
+    case
+      when twitter_url is null then null
+      else regexp_replace(twitter_url, '^https?://((www\\.)?twitter\\.com|x\\.com)/', '')
+    end,
     twitter_url,
     linkedin_url,
     sector_focus,

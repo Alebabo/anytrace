@@ -29,6 +29,16 @@ function normalizeHandle(value?: string | null) {
   return value?.replace(/^@/, "").trim().toLowerCase() ?? "";
 }
 
+function extractHandleFromUrl(value?: string | null) {
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    return normalizeHandle(parsed.pathname.split("/").filter(Boolean).at(-1) ?? "");
+  } catch {
+    return normalizeHandle(value);
+  }
+}
+
 function toResolvedXUser(raw: TwitterApiUser | null | undefined): ResolvedXUser | null {
   if (!raw) return null;
 
@@ -106,8 +116,7 @@ async function fetchCurrentFollowings(handle: string) {
 export async function syncXSignals() {
   const { data: vcs, error: vcError } = await supabaseAdmin
     .from("vc_sources")
-    .select("id, name, x_handle, x_user_id")
-    .not("x_handle", "is", null)
+    .select("id, name, x_handle, x_user_id, twitter_url")
     .order("last_x_sync_at", { ascending: true, nullsFirst: true })
     .limit(env.xMaxVcsPerSync);
 
@@ -116,11 +125,19 @@ export async function syncXSignals() {
   let snapshotsCreated = 0;
   let signalsCreated = 0;
   const syncedHandles: string[] = [];
+  const consideredHandles: string[] = [];
   const skipped: Array<{ handle: string; reason: string }> = [];
 
   for (const vc of vcs ?? []) {
-    const handle = normalizeHandle(vc.x_handle);
-    if (!handle) continue;
+    const handle = normalizeHandle(vc.x_handle) || extractHandleFromUrl(vc.twitter_url);
+    if (!handle) {
+      skipped.push({
+        handle: vc.name,
+        reason: "No usable x_handle or twitter_url on vc_sources row.",
+      });
+      continue;
+    }
+    consideredHandles.push(handle);
 
     try {
       const profile = await fetchXProfile(handle);
@@ -215,6 +232,7 @@ export async function syncXSignals() {
       await supabaseAdmin
         .from("vc_sources")
         .update({
+          x_handle: handle,
           x_user_id: profile?.id ?? vc.x_user_id,
           sync_status: "ok",
           last_x_sync_at: new Date().toISOString(),
@@ -243,6 +261,8 @@ export async function syncXSignals() {
 
   return {
     ok: true,
+    candidates: consideredHandles.length,
+    consideredHandles,
     synced: syncedHandles.length,
     syncedHandles,
     snapshotsCreated,
