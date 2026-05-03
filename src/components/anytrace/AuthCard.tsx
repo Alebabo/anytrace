@@ -2,13 +2,14 @@ import { useState } from "react";
 import { ArrowRight, Loader2, Mail, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useEnableDemoMode, useMagicLinkSignIn } from "@/hooks/useAnytrace";
+import { useEnableDemoMode, useLoginAsAle, useMagicLinkSignIn } from "@/hooks/useAnytrace";
 import { toast } from "sonner";
 
 export function AuthCard() {
   const [email, setEmail] = useState("");
   const signIn = useMagicLinkSignIn();
   const enableDemo = useEnableDemoMode();
+  const loginAsAle = useLoginAsAle();
 
   const handleSubmit = async () => {
     const trimmed = email.trim();
@@ -31,6 +32,15 @@ export function AuthCard() {
       toast.success("Demo mode enabled. Magic link bypassed for now.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not enable demo mode.");
+    }
+  };
+
+  const handleAleMode = async () => {
+    try {
+      await loginAsAle.mutateAsync();
+      toast.success("Signed in as Ale in local test mode.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start Ale test mode.");
     }
   };
 
@@ -73,6 +83,20 @@ export function AuthCard() {
             <>
               Continue in demo mode <ArrowRight className="h-4 w-4" />
             </>
+          )}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handleAleMode}
+          disabled={loginAsAle.isPending}
+          className="h-11 rounded-full"
+        >
+          {loginAsAle.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Logging in as Ale
+            </>
+          ) : (
+            "Als Ale einloggen"
           )}
         </Button>
       </div>

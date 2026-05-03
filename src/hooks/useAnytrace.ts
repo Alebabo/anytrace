@@ -36,8 +36,22 @@ type EventRow = Database["public"]["Tables"]["activity_events"]["Row"];
 
 const DEMO_MODE_KEY = "anytrace-demo-mode";
 const DEMO_MODE_EVENT = "anytrace-demo-mode-change";
+const DEMO_PROFILE_KEY = "anytrace-demo-profile-v1";
 const DEMO_VC_CATALOG_KEY = "anytrace-demo-vc-catalog-v2";
 const DEMO_VC_SELECTED_IDS_KEY = "anytrace-demo-selected-vc-ids-v2";
+const LOCAL_GITHUB_PEOPLE_KEY = "anytrace-local-github-people-v1";
+const LOCAL_GITHUB_SELECTED_IDS_KEY = "anytrace-local-github-selected-ids-v1";
+
+type DemoProfile = {
+  email: string;
+  id: string;
+  fullName?: string;
+};
+
+type LocalGithubEntry = {
+  person: TrackedPerson;
+  identities: PersonIdentity[];
+};
 
 function readDemoMode() {
   if (typeof window === "undefined") return false;
@@ -57,6 +71,18 @@ function writeDemoMode(next: boolean) {
     window.localStorage.removeItem(DEMO_MODE_KEY);
   }
   emitDemoModeEvent();
+}
+
+function readDemoProfile(): DemoProfile {
+  return readJson(DEMO_PROFILE_KEY, {
+    email: "demo@anytrace.local",
+    id: "demo-user",
+    fullName: "Demo User",
+  });
+}
+
+function writeDemoProfile(profile: DemoProfile) {
+  writeJson(DEMO_PROFILE_KEY, profile);
 }
 
 function slugifyVc(name: string, firm: string) {
@@ -128,6 +154,34 @@ function readDemoSelectedVcIds() {
 
 function writeDemoSelectedVcIds(ids: string[]) {
   writeJson(DEMO_VC_SELECTED_IDS_KEY, ids);
+}
+
+function readLocalGithubEntries() {
+  return readJson<LocalGithubEntry[]>(LOCAL_GITHUB_PEOPLE_KEY, []);
+}
+
+function writeLocalGithubEntries(entries: LocalGithubEntry[]) {
+  writeJson(LOCAL_GITHUB_PEOPLE_KEY, entries);
+}
+
+function readLocalGithubSelectedIds() {
+  return readJson<string[]>(LOCAL_GITHUB_SELECTED_IDS_KEY, []);
+}
+
+function writeLocalGithubSelectedIds(ids: string[]) {
+  writeJson(LOCAL_GITHUB_SELECTED_IDS_KEY, ids);
+}
+
+function githubProfileUrl(handle: string) {
+  return `https://github.com/${handle}`;
+}
+
+function xProfileUrl(handle: string) {
+  return `https://x.com/${handle}`;
+}
+
+function linkedinProfileUrl(handle: string) {
+  return handle.startsWith("http") ? handle : `https://www.linkedin.com/in/${handle}/`;
 }
 
 function mapVc(row: VcRow): VcSource {
@@ -339,9 +393,10 @@ export function useAccessState() {
   );
 
   if (demoMode) {
+    const demoProfile = readDemoProfile();
     return {
       session: {
-        user: { id: "demo-user", email: "demo@anytrace.local" },
+        user: { id: demoProfile.id, email: demoProfile.email },
       } as Session,
       loading: false,
       access: {
@@ -384,9 +439,30 @@ export function useMagicLinkSignIn() {
 
 export function useEnableDemoMode() {
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (profile?: Partial<DemoProfile>) => {
+      if (profile?.email || profile?.id || profile?.fullName) {
+        const existing = readDemoProfile();
+        writeDemoProfile({
+          ...existing,
+          ...profile,
+          email: profile?.email ?? existing.email,
+          id: profile?.id ?? existing.id,
+        });
+      }
       writeDemoMode(true);
     },
+  });
+}
+
+export function useLoginAsAle() {
+  const enableDemo = useEnableDemoMode();
+  return useMutation({
+    mutationFn: async () =>
+      enableDemo.mutateAsync({
+        id: "ale-user",
+        email: "ale@anytrace.local",
+        fullName: "Ale",
+      }),
   });
 }
 
@@ -394,6 +470,11 @@ export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
+      writeDemoProfile({
+        email: "demo@anytrace.local",
+        id: "demo-user",
+        fullName: "Demo User",
+      });
       writeDemoMode(false);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -693,14 +774,19 @@ export function useTrackedPeople(enabled = true) {
     enabled,
     staleTime: 60_000,
     queryFn: async () => {
-      if (demoMode) return demoTrackedPeople;
+      const localPeople = readLocalGithubEntries().map((entry) => entry.person);
+      if (demoMode) {
+        const merged = [...demoTrackedPeople, ...localPeople];
+        return Array.from(new Map(merged.map((person) => [person.id, person])).values());
+      }
       const { data, error } = await supabase
         .from("tracked_people")
         .select("*")
         .eq("is_watchlist", true)
         .order("full_name");
       if (error) throw error;
-      return (data ?? []).map(mapPerson);
+      const merged = [...(data ?? []).map(mapPerson), ...localPeople];
+      return Array.from(new Map(merged.map((person) => [person.id, person])).values());
     },
   });
 }
@@ -712,13 +798,18 @@ export function usePersonIdentities(enabled = true) {
     enabled,
     staleTime: 60_000,
     queryFn: async () => {
-      if (demoMode) return demoPersonIdentities;
+      const localIdentities = readLocalGithubEntries().flatMap((entry) => entry.identities);
+      if (demoMode) {
+        const merged = [...demoPersonIdentities, ...localIdentities];
+        return Array.from(new Map(merged.map((identity) => [identity.id, identity])).values());
+      }
       const { data, error } = await supabase
         .from("person_identities")
         .select("*")
         .order("platform");
       if (error) throw error;
-      return (data ?? []).map(mapIdentity);
+      const merged = [...(data ?? []).map(mapIdentity), ...localIdentities];
+      return Array.from(new Map(merged.map((identity) => [identity.id, identity])).values());
     },
   });
 }
@@ -763,6 +854,7 @@ export function useWatchlist(enabled = true) {
   const identitiesQuery = usePersonIdentities(enabled);
   const eventsQuery = useActivityEvents(enabled);
   const selectedVcsQuery = useSelectedVcWatchlist(enabled);
+  const demoMode = useDemoMode();
 
   return {
     data: useMemo<WatchlistData>(() => {
@@ -772,6 +864,14 @@ export function useWatchlist(enabled = true) {
           people: [],
         };
       }
+      const explicitSelectedGithubIds = readLocalGithubSelectedIds();
+      const selectedGithubIds = new Set(
+        explicitSelectedGithubIds.length > 0
+          ? explicitSelectedGithubIds
+          : demoMode
+            ? demoTrackedPeople.map((person) => person.id)
+            : peopleQuery.data.map((person) => person.id),
+      );
       const identitiesByPerson = new Map<string, PersonIdentity[]>();
       for (const identity of identitiesQuery.data) {
         const list = identitiesByPerson.get(identity.personId) ?? [];
@@ -779,7 +879,9 @@ export function useWatchlist(enabled = true) {
         identitiesByPerson.set(identity.personId, list);
       }
 
-      const people = peopleQuery.data.map<WatchlistPerson>((person) => {
+      const people = peopleQuery.data
+        .filter((person) => selectedGithubIds.has(person.id))
+        .map<WatchlistPerson>((person) => {
         const personEvents = eventsQuery.data.filter((event) => event.personId === person.id);
         return {
           ...person,
@@ -800,7 +902,7 @@ export function useWatchlist(enabled = true) {
         selectedVcs: selectedVcsQuery.data ?? [],
         people,
       };
-    }, [eventsQuery.data, identitiesQuery.data, peopleQuery.data, selectedVcsQuery.data]),
+    }, [demoMode, eventsQuery.data, identitiesQuery.data, peopleQuery.data, selectedVcsQuery.data]),
     isLoading:
       peopleQuery.isLoading ||
       identitiesQuery.isLoading ||
@@ -817,6 +919,129 @@ export function useWatchlist(enabled = true) {
       eventsQuery.error ??
       selectedVcsQuery.error,
   };
+}
+
+export function useAddGithubPersonToWatchlist() {
+  const qc = useQueryClient();
+  const { demoMode } = useAccessState();
+
+  return useMutation({
+    mutationFn: async (input: {
+      existing?: {
+        person: TrackedPerson;
+        identities: PersonIdentity[];
+      };
+      draft?: {
+        fullName: string;
+        githubHandle: string;
+        xHandle?: string;
+        linkedinHandle?: string;
+        roleTitle?: string;
+        company?: string;
+        location?: string;
+        summary?: string;
+      };
+    }) => {
+      const selectedIds = new Set(readLocalGithubSelectedIds());
+
+      if (input.existing) {
+        selectedIds.add(input.existing.person.id);
+        writeLocalGithubSelectedIds(Array.from(selectedIds));
+        return input.existing.person.id;
+      }
+
+      const draft = input.draft;
+      if (!draft?.fullName.trim() || !draft.githubHandle.trim()) {
+        throw new Error("Name and GitHub handle are required.");
+      }
+
+      const githubHandle = draft.githubHandle.trim().replace(/^@/, "");
+      const personId = `local-gh-${crypto.randomUUID()}`;
+      const person: TrackedPerson = {
+        id: personId,
+        slug: githubHandle.toLowerCase(),
+        fullName: draft.fullName.trim(),
+        roleTitle: draft.roleTitle?.trim() || "GitHub builder",
+        company: draft.company?.trim() || "",
+        location: draft.location?.trim() || "",
+        summary: draft.summary?.trim() || `Manually added GitHub person @${githubHandle}.`,
+        avatarUrl: null,
+        topPickNote: "",
+        isWatchlist: true,
+      };
+
+      const identities: PersonIdentity[] = [
+        {
+          id: `local-gh-identity-${crypto.randomUUID()}`,
+          personId,
+          platform: "github",
+          handle: githubHandle,
+          profileUrl: githubProfileUrl(githubHandle),
+          isPrimary: true,
+        },
+      ];
+
+      const xHandle = draft.xHandle?.trim().replace(/^@/, "");
+      if (xHandle) {
+        identities.push({
+          id: `local-x-identity-${crypto.randomUUID()}`,
+          personId,
+          platform: "x",
+          handle: xHandle,
+          profileUrl: xProfileUrl(xHandle),
+          isPrimary: true,
+        });
+      }
+
+      const linkedinHandle = draft.linkedinHandle?.trim();
+      if (linkedinHandle) {
+        identities.push({
+          id: `local-li-identity-${crypto.randomUUID()}`,
+          personId,
+          platform: "linkedin",
+          handle: linkedinHandle,
+          profileUrl: linkedinProfileUrl(linkedinHandle),
+          isPrimary: true,
+        });
+      }
+
+      const entries = readLocalGithubEntries();
+      entries.push({ person, identities });
+      writeLocalGithubEntries(entries);
+      selectedIds.add(personId);
+      writeLocalGithubSelectedIds(Array.from(selectedIds));
+
+      return personId;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tracked-people"] });
+      qc.invalidateQueries({ queryKey: ["person-identities"] });
+      qc.invalidateQueries({ queryKey: ["activity-events"] });
+      qc.invalidateQueries({ queryKey: ["graph-data"] });
+    },
+  });
+}
+
+export function useRemoveGithubPersonFromWatchlist() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (personId: string) => {
+      const selectedIds = readLocalGithubSelectedIds().filter((id) => id !== personId);
+      writeLocalGithubSelectedIds(selectedIds);
+
+      if (personId.startsWith("local-gh-")) {
+        const remainingEntries = readLocalGithubEntries().filter((entry) => entry.person.id !== personId);
+        writeLocalGithubEntries(remainingEntries);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tracked-people"] });
+      qc.invalidateQueries({ queryKey: ["person-identities"] });
+      qc.invalidateQueries({ queryKey: ["activity-events"] });
+      qc.invalidateQueries({ queryKey: ["graph-data"] });
+    },
+  });
 }
 
 export function useGraphData(enabled = true, viewMode: "selected" | "all" = "selected") {

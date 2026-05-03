@@ -1,17 +1,30 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Github, Linkedin, Loader2, Plus, Trash2, Twitter } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAccessState,
+  useAddGithubPersonToWatchlist,
   useAddVcToWatchlist,
+  usePersonIdentities,
+  useRemoveGithubPersonFromWatchlist,
   useRemoveVcFromWatchlist,
+  useTrackedPeople,
+  useVcSources,
   useWatchlist,
 } from "@/hooks/useAnytrace";
-import type { PersonIdentity, UserVcWatchlistItem, VcSourceDraft, WatchlistPerson } from "@/data/anytrace";
+import type {
+  PersonIdentity,
+  TrackedPerson,
+  UserVcWatchlistItem,
+  VcSource,
+  VcSourceDraft,
+  WatchlistPerson,
+} from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
@@ -63,10 +76,12 @@ function SelectedVcRow({
               <Linkedin className="h-4 w-4" />
             </a>
           )}
+          {vcSource.githubUsername && (
+            <a href={`https://github.com/${vcSource.githubUsername}`} target="_blank" rel="noreferrer" className="hover:text-foreground">
+              <Github className="h-4 w-4" />
+            </a>
+          )}
         </div>
-        <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
-          {vcSource.syncStatus ?? "idle"}
-        </span>
         <Button
           variant="ghost"
           size="icon"
@@ -81,62 +96,73 @@ function SelectedVcRow({
   );
 }
 
-function WatchlistRow({ person }: { person: WatchlistPerson }) {
+function SelectedGithubRow({
+  person,
+  onRemove,
+  busy,
+}: {
+  person: WatchlistPerson;
+  onRemove: (personId: string) => void;
+  busy: boolean;
+}) {
   const github = identityFor(person.identities, "github");
   const x = identityFor(person.identities, "x");
   const linkedin = identityFor(person.identities, "linkedin");
 
   return (
-    <div className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-border last:border-b-0 items-center">
-      <div className="col-span-4 flex items-center gap-3 min-w-0">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-4">
+      <div className="min-w-0 flex items-center gap-3">
         <EntityAvatar
           name={person.fullName}
           imageUrls={avatarSourcesForPerson(person, person.identities)}
-          size={38}
+          size={40}
           rounded="xl"
         />
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{person.fullName}</div>
-          <div className="text-xs text-muted-foreground truncate">
+          <div className="text-xs text-muted-foreground mt-1 truncate">
             {person.roleTitle}
             {person.company ? ` / ${person.company}` : ""}
+            {person.location ? ` / ${person.location}` : ""}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-1">
+            {person.vcFollowersThisWeek} VC follows / {person.githubMomentum} repo delta
           </div>
         </div>
       </div>
-      <div className="col-span-2 text-sm text-muted-foreground">{person.location}</div>
-      <div className="col-span-2 text-sm">
-        <span className="font-medium">{person.vcFollowersThisWeek}</span>
-        <span className="text-muted-foreground"> VC follows</span>
-      </div>
-      <div className="col-span-2 text-sm">
-        <span className="font-medium">{person.githubMomentum}</span>
-        <span className="text-muted-foreground"> repo delta</span>
-      </div>
-      <div className="col-span-1 text-sm">
-        <span className="font-medium">{person.importantGithubFollowers}</span>
-      </div>
-      <div className="col-span-1 flex items-center justify-end gap-3 text-muted-foreground">
-        {linkedin && (
-          <a href={linkedin.profileUrl} target="_blank" rel="noreferrer" className="hover:text-signal-linkedin">
-            <Linkedin className="h-4 w-4" />
-          </a>
-        )}
-        {x && (
-          <a href={x.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
-            <Twitter className="h-4 w-4" />
-          </a>
-        )}
-        {github && (
-          <a href={github.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
-            <Github className="h-4 w-4" />
-          </a>
-        )}
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {x && (
+            <a href={x.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
+              <Twitter className="h-4 w-4" />
+            </a>
+          )}
+          {linkedin && (
+            <a href={linkedin.profileUrl} target="_blank" rel="noreferrer" className="hover:text-signal-linkedin">
+              <Linkedin className="h-4 w-4" />
+            </a>
+          )}
+          {github && (
+            <a href={github.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
+              <Github className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full"
+          disabled={busy}
+          onClick={() => onRemove(person.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
 }
 
-const emptyDraft: VcSourceDraft = {
+const emptyVcDraft: VcSourceDraft = {
   name: "",
   country: "",
   sizeLabel: "",
@@ -148,119 +174,248 @@ const emptyDraft: VcSourceDraft = {
   notes: "",
 };
 
+const emptyGithubDraft = {
+  fullName: "",
+  githubHandle: "",
+  xHandle: "",
+  linkedinHandle: "",
+  roleTitle: "",
+  company: "",
+  location: "",
+  summary: "",
+};
+
 export default function WatchlistPage() {
   const { access } = useAccessState();
   const watchlistQuery = useWatchlist(access.isAuthenticated);
+  const vcCatalogQuery = useVcSources(access.isAuthenticated);
+  const peopleQuery = useTrackedPeople(access.isAuthenticated);
+  const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const addVc = useAddVcToWatchlist();
   const removeVc = useRemoveVcFromWatchlist();
-  const [draft, setDraft] = useState<VcSourceDraft>(emptyDraft);
+  const addGithubPerson = useAddGithubPersonToWatchlist();
+  const removeGithubPerson = useRemoveGithubPersonFromWatchlist();
+
+  const [selectedVcId, setSelectedVcId] = useState("");
+  const [selectedGithubPersonId, setSelectedGithubPersonId] = useState("");
+  const [vcDraft, setVcDraft] = useState<VcSourceDraft>(emptyVcDraft);
+  const [githubDraft, setGithubDraft] = useState(emptyGithubDraft);
 
   const watchlist = watchlistQuery.data;
   const selectedVcs = watchlist?.selectedVcs ?? [];
-  const people = watchlist?.people ?? [];
+  const selectedGithubPeople = watchlist?.people ?? [];
+  const identities = identitiesQuery.data ?? [];
+  const allPeople = peopleQuery.data ?? [];
+  const allVcs = vcCatalogQuery.data ?? [];
 
-  const submitDraft = async () => {
-    if (
-      !draft.name.trim() ||
-      !draft.country.trim() ||
-      !draft.sizeLabel.trim() ||
-      !draft.sectorFocus.trim() ||
-      !draft.twitterUrl.trim() ||
-      !draft.linkedinUrl.trim()
-    ) {
-      return;
-    }
-    await addVc.mutateAsync(draft);
-    setDraft(emptyDraft);
+  const selectedVcIds = useMemo(() => new Set(selectedVcs.map((item) => item.vcSourceId)), [selectedVcs]);
+  const selectedGithubIds = useMemo(() => new Set(selectedGithubPeople.map((person) => person.id)), [selectedGithubPeople]);
+
+  const vcOptions = useMemo(
+    () => allVcs.filter((vc) => !selectedVcIds.has(vc.id)),
+    [allVcs, selectedVcIds],
+  );
+
+  const githubOptions = useMemo(
+    () =>
+      allPeople
+        .filter((person) => !selectedGithubIds.has(person.id))
+        .map((person) => ({
+          person,
+          identities: identities.filter((identity) => identity.personId === person.id),
+        }))
+        .filter((entry) => entry.identities.some((identity) => identity.platform === "github")),
+    [allPeople, identities, selectedGithubIds],
+  );
+
+  const addExistingVc = async () => {
+    const vc = vcOptions.find((entry) => entry.id === selectedVcId);
+    if (!vc) return;
+
+    await addVc.mutateAsync({
+      name: vc.name,
+      country: vc.country,
+      sizeLabel: vc.sizeLabel ?? vc.title,
+      sectorFocus: vc.sectorFocus ?? vc.firm,
+      twitterUrl: vc.twitterUrl ?? vc.xHandle ?? "",
+      linkedinUrl: vc.linkedinUrl ?? "",
+      githubUsername: vc.githubUsername ?? "",
+      websiteUrl: vc.websiteUrl ?? "",
+      notes: vc.notes,
+      city: vc.city,
+      region: vc.region,
+      tier: vc.tier,
+    });
+    setSelectedVcId("");
+  };
+
+  const addExistingGithubPerson = async () => {
+    const entry = githubOptions.find((option) => option.person.id === selectedGithubPersonId);
+    if (!entry) return;
+
+    await addGithubPerson.mutateAsync({
+      existing: entry,
+    });
+    setSelectedGithubPersonId("");
+  };
+
+  const submitVcDraft = async () => {
+    await addVc.mutateAsync(vcDraft);
+    setVcDraft(emptyVcDraft);
+  };
+
+  const submitGithubDraft = async () => {
+    await addGithubPerson.mutateAsync({
+      draft: githubDraft,
+    });
+    setGithubDraft(emptyGithubDraft);
   };
 
   return (
     <ProductGate
       title="Watchlist"
-      description="Choose the VCs you want to follow. Those selected accounts become your personal signal sources for the graph and X ingest."
+      description="Build your own VC source list and your own GitHub people list. Both selectors can also create new entries manually."
     >
       <div className="px-4 md:px-8 py-10 max-w-6xl mx-auto">
         <div className="flex items-end justify-between gap-6 mb-10 flex-wrap">
           <div>
             <h2 className="font-serif text-5xl leading-[1.05]">Watchlist</h2>
             <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
-              Selected VCs define your signal graph. Tracked people remain the universe that Anytrace scores with X and GitHub evidence.
+              One selector controls which VCs feed your graph. The second keeps a focused list of GitHub-native people you want to track manually.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Selected VCs" value={selectedVcs.length} />
-            <Stat label="Tracked people" value={people.length} />
-            <Stat label="LinkedIn" value="Later" />
+            <Stat label="Git people" value={selectedGithubPeople.length} />
+            <Stat label="Available VCs" value={vcOptions.length} />
           </div>
         </div>
 
         <div className="grid gap-8">
-          <section>
-            <div className="flex items-end justify-between gap-4 mb-4 flex-wrap">
-              <div>
-                <h3 className="text-lg font-medium">Selected VCs</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Add venture accounts manually. The graph only renders edges from this personal VC set.
-                </p>
-              </div>
-            </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="rounded-[28px] border-border p-6 shadow-none">
+              <h3 className="text-lg font-medium">VC dropdown</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Pick an existing VC from the catalog or add one manually.
+              </p>
 
-            <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm mb-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <Input
-                  placeholder="Name"
-                  value={draft.name}
-                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-                />
-                <Input
-                  placeholder="Land"
-                  value={draft.country}
-                  onChange={(event) => setDraft((current) => ({ ...current, country: event.target.value }))}
-                />
-                <Input
-                  placeholder="Groesse"
-                  value={draft.sizeLabel}
-                  onChange={(event) => setDraft((current) => ({ ...current, sizeLabel: event.target.value }))}
-                />
-                <Input
-                  placeholder="Branche"
-                  value={draft.sectorFocus}
-                  onChange={(event) => setDraft((current) => ({ ...current, sectorFocus: event.target.value }))}
-                />
-                <Input
-                  placeholder="Twitter URL"
-                  value={draft.twitterUrl}
-                  onChange={(event) => setDraft((current) => ({ ...current, twitterUrl: event.target.value }))}
-                />
-                <Input
-                  placeholder="LinkedIn URL"
-                  value={draft.linkedinUrl}
-                  onChange={(event) => setDraft((current) => ({ ...current, linkedinUrl: event.target.value }))}
-                />
-                <Input
-                  placeholder="GitHub username (optional)"
-                  value={draft.githubUsername}
-                  onChange={(event) => setDraft((current) => ({ ...current, githubUsername: event.target.value }))}
-                />
-              </div>
-              <div className="mt-4 flex justify-end">
+              <div className="mt-5 flex gap-3">
+                <select
+                  className="flex h-11 w-full rounded-full border border-input bg-background px-4 text-sm"
+                  value={selectedVcId}
+                  onChange={(event) => setSelectedVcId(event.target.value)}
+                >
+                  <option value="">Existing VC auswahlen</option>
+                  {vcOptions.map((vc) => (
+                    <option key={vc.id} value={vc.id}>
+                      {vc.name} / {vc.country}
+                    </option>
+                  ))}
+                </select>
                 <Button
-                  className="rounded-full gap-2"
-                  onClick={submitDraft}
-                  disabled={
-                    addVc.isPending ||
-                    !draft.name.trim() ||
-                    !draft.country.trim() ||
-                    !draft.sizeLabel.trim() ||
-                    !draft.sectorFocus.trim() ||
-                    !draft.twitterUrl.trim() ||
-                    !draft.linkedinUrl.trim()
-                  }
+                  className="rounded-full"
+                  disabled={addVc.isPending || !selectedVcId}
+                  onClick={addExistingVc}
                 >
                   {addVc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  Add VC
                 </Button>
               </div>
+
+              <div className="mt-5 grid gap-3">
+                <Input placeholder="VC name" value={vcDraft.name} onChange={(event) => setVcDraft((current) => ({ ...current, name: event.target.value }))} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input placeholder="Country" value={vcDraft.country} onChange={(event) => setVcDraft((current) => ({ ...current, country: event.target.value }))} />
+                  <Input placeholder="Size" value={vcDraft.sizeLabel} onChange={(event) => setVcDraft((current) => ({ ...current, sizeLabel: event.target.value }))} />
+                </div>
+                <Input placeholder="Sector focus" value={vcDraft.sectorFocus} onChange={(event) => setVcDraft((current) => ({ ...current, sectorFocus: event.target.value }))} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input placeholder="X / Twitter URL" value={vcDraft.twitterUrl} onChange={(event) => setVcDraft((current) => ({ ...current, twitterUrl: event.target.value }))} />
+                  <Input placeholder="LinkedIn URL" value={vcDraft.linkedinUrl} onChange={(event) => setVcDraft((current) => ({ ...current, linkedinUrl: event.target.value }))} />
+                </div>
+                <Input placeholder="GitHub username (optional)" value={vcDraft.githubUsername} onChange={(event) => setVcDraft((current) => ({ ...current, githubUsername: event.target.value }))} />
+                <div className="flex justify-end">
+                  <Button
+                    className="rounded-full"
+                    disabled={
+                      addVc.isPending ||
+                      !vcDraft.name.trim() ||
+                      !vcDraft.country.trim() ||
+                      !vcDraft.sizeLabel.trim() ||
+                      !vcDraft.sectorFocus.trim() ||
+                      !vcDraft.twitterUrl.trim() ||
+                      !vcDraft.linkedinUrl.trim()
+                    }
+                    onClick={submitVcDraft}
+                  >
+                    Add VC manually
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="rounded-[28px] border-border p-6 shadow-none">
+              <h3 className="text-lg font-medium">Git people dropdown</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Pick an existing GitHub person or create one manually for testing and tracking.
+              </p>
+
+              <div className="mt-5 flex gap-3">
+                <select
+                  className="flex h-11 w-full rounded-full border border-input bg-background px-4 text-sm"
+                  value={selectedGithubPersonId}
+                  onChange={(event) => setSelectedGithubPersonId(event.target.value)}
+                >
+                  <option value="">Existing Git person auswahlen</option>
+                  {githubOptions.map((entry) => {
+                    const github = identityFor(entry.identities, "github");
+                    return (
+                      <option key={entry.person.id} value={entry.person.id}>
+                        {entry.person.fullName} / @{github?.handle ?? "github"}
+                      </option>
+                    );
+                  })}
+                </select>
+                <Button
+                  className="rounded-full"
+                  disabled={addGithubPerson.isPending || !selectedGithubPersonId}
+                  onClick={addExistingGithubPerson}
+                >
+                  {addGithubPerson.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                </Button>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                <Input placeholder="Full name" value={githubDraft.fullName} onChange={(event) => setGithubDraft((current) => ({ ...current, fullName: event.target.value }))} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input placeholder="GitHub handle" value={githubDraft.githubHandle} onChange={(event) => setGithubDraft((current) => ({ ...current, githubHandle: event.target.value }))} />
+                  <Input placeholder="X handle (optional)" value={githubDraft.xHandle} onChange={(event) => setGithubDraft((current) => ({ ...current, xHandle: event.target.value }))} />
+                </div>
+                <Input placeholder="LinkedIn handle or URL (optional)" value={githubDraft.linkedinHandle} onChange={(event) => setGithubDraft((current) => ({ ...current, linkedinHandle: event.target.value }))} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input placeholder="Role title" value={githubDraft.roleTitle} onChange={(event) => setGithubDraft((current) => ({ ...current, roleTitle: event.target.value }))} />
+                  <Input placeholder="Company" value={githubDraft.company} onChange={(event) => setGithubDraft((current) => ({ ...current, company: event.target.value }))} />
+                </div>
+                <Input placeholder="Location" value={githubDraft.location} onChange={(event) => setGithubDraft((current) => ({ ...current, location: event.target.value }))} />
+                <Input placeholder="Short summary (optional)" value={githubDraft.summary} onChange={(event) => setGithubDraft((current) => ({ ...current, summary: event.target.value }))} />
+                <div className="flex justify-end">
+                  <Button
+                    className="rounded-full"
+                    disabled={addGithubPerson.isPending || !githubDraft.fullName.trim() || !githubDraft.githubHandle.trim()}
+                    onClick={submitGithubDraft}
+                  >
+                    Add Git person manually
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <section>
+            <div className="mb-4">
+              <h3 className="text-lg font-medium">Selected VCs</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                These accounts define the investor side of your graph.
+              </p>
             </div>
 
             {watchlistQuery.isLoading ? (
@@ -271,7 +426,7 @@ export default function WatchlistPage() {
               </div>
             ) : selectedVcs.length === 0 ? (
               <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                No VCs selected yet. Add a few accounts above so the graph has sources to render.
+                No VCs selected yet. Add one from the VC dropdown above.
               </div>
             ) : (
               <div className="space-y-3">
@@ -289,34 +444,31 @@ export default function WatchlistPage() {
 
           <section>
             <div className="mb-4">
-              <h3 className="text-lg font-medium">Tracked people</h3>
+              <h3 className="text-lg font-medium">Selected Git people</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                GitHub repo traction and important new GitHub followers add conviction on top of the VC signal layer.
+                This is your manually curated list of GitHub-native people for testing and tracking.
               </p>
             </div>
 
-            {watchlistQuery.isLoading ? (
+            {watchlistQuery.isLoading || peopleQuery.isLoading || identitiesQuery.isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <Skeleton key={index} className="h-20 w-full rounded-[28px]" />
                 ))}
               </div>
-            ) : watchlistQuery.isError ? (
+            ) : selectedGithubPeople.length === 0 ? (
               <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                Could not load the watchlist.
+                No Git people selected yet. Add someone from the second dropdown or create a manual entry.
               </div>
             ) : (
-              <div className="rounded-[28px] border border-border bg-card overflow-hidden shadow-sm">
-                <div className="grid grid-cols-12 gap-4 px-5 py-3 border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <div className="col-span-4">Person</div>
-                  <div className="col-span-2">Location</div>
-                  <div className="col-span-2">VC attention</div>
-                  <div className="col-span-2">GitHub</div>
-                  <div className="col-span-1">Important</div>
-                  <div className="col-span-1 text-right">Profiles</div>
-                </div>
-                {people.map((person) => (
-                  <WatchlistRow key={person.id} person={person} />
+              <div className="space-y-3">
+                {selectedGithubPeople.map((person) => (
+                  <SelectedGithubRow
+                    key={person.id}
+                    person={person}
+                    busy={removeGithubPerson.isPending}
+                    onRemove={(personId) => removeGithubPerson.mutate(personId)}
+                  />
                 ))}
               </div>
             )}
