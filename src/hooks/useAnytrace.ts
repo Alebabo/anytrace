@@ -23,8 +23,8 @@ type LocalSession = {
 
 const FRONTEND_ONLY_SESSION: LocalSession = {
   user: {
-    id: "frontend-only-user",
-    email: "frontend-only@anytrace.local",
+    id: "local-user",
+    email: "local@anytrace.app",
   },
 };
 
@@ -136,14 +136,26 @@ export function useRunTwitterScrape() {
 }
 
 export function useVcSources(_enabled = true) {
-  const enabled = _enabled && hasFrontendSupabaseConfig();
-
-  return useQuery({
+  const query = useQuery({
     queryKey: ["anytrace", "vcs"],
     queryFn: fetchVcSources,
-    enabled,
+    enabled: _enabled,
     staleTime: 60_000,
   });
+
+  return useMemo(
+    () => ({
+      ...query,
+      data: (query.data ?? []) as VcSource[],
+      isError: query.isError || (_enabled && !hasFrontendSupabaseConfig()),
+      error:
+        query.error ??
+        (_enabled && !hasFrontendSupabaseConfig()
+          ? new Error("Frontend Supabase config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.")
+          : null),
+    }),
+    [query, _enabled],
+  );
 }
 
 export function useSelectedVcWatchlist(_enabled = true) {
@@ -254,11 +266,10 @@ export function useRemoveGithubPersonFromWatchlist() {
 }
 
 export function useGraphData(_enabled = true) {
-  const enabled = _enabled && hasFrontendSupabaseConfig();
   const query = useQuery({
     queryKey: ["anytrace", "graph"],
     queryFn: fetchGraphData,
-    enabled,
+    enabled: _enabled,
     staleTime: 60_000,
   });
 
@@ -266,7 +277,13 @@ export function useGraphData(_enabled = true) {
     () => ({
       ...query,
       data: (query.data ?? EMPTY_GRAPH) as GraphData,
+      isError: query.isError || (_enabled && !hasFrontendSupabaseConfig()),
+      error:
+        query.error ??
+        (_enabled && !hasFrontendSupabaseConfig()
+          ? new Error("Frontend Supabase config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.")
+          : null),
     }),
-    [query],
+    [query, _enabled],
   );
 }

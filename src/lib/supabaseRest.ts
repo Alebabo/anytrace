@@ -25,6 +25,14 @@ function getSupabaseConfig(): SupabaseConfig | null {
   return { url, anonKey };
 }
 
+function requireSupabaseConfig(): SupabaseConfig {
+  const config = getSupabaseConfig();
+  if (!config) {
+    throw new Error("Frontend Supabase config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+  }
+  return config;
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -84,11 +92,7 @@ function mapVcSource(row: RawVcRow): VcSource {
 }
 
 async function supabaseSelect<T>(table: string, selectClause: string, orderClause?: string): Promise<T[]> {
-  const config = getSupabaseConfig();
-
-  if (!config) {
-    return [];
-  }
+  const config = requireSupabaseConfig();
 
   const endpoint = new URL(`/rest/v1/${table}`, config.url);
   endpoint.searchParams.set("select", selectClause);

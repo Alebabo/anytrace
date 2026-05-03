@@ -52,7 +52,7 @@ export default function AppLayout() {
     onItemClick?: () => void;
     collapsed?: boolean;
   }) => (
-    <nav className="flex-1 flex flex-col px-3 py-2 space-y-0.5">
+    <nav className="flex flex-1 flex-col space-y-0.5 px-3 py-2">
       {nav.map((item) => (
         <NavLink
           key={item.to}
@@ -61,9 +61,9 @@ export default function AppLayout() {
           onClick={onItemClick}
           title={collapsed ? item.label : undefined}
           className={({ isActive }) =>
-            `group flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2 px-3 py-2 rounded-full text-sm transition-colors ${
+            `group flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2 rounded-full px-3 py-2 text-sm transition-colors ${
               isActive
-                ? "bg-sidebar-accent text-foreground font-medium"
+                ? "bg-sidebar-accent font-medium text-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
             }`
           }
@@ -78,11 +78,13 @@ export default function AppLayout() {
   );
 
   return (
-    <div className="min-h-screen flex w-full bg-background text-foreground">
+    <div className="flex min-h-screen w-full bg-background text-foreground">
       <aside
-        className={`hidden md:flex ${sidebarCollapsed ? "w-16" : "w-60"} shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-[width] duration-200 sticky top-0 h-screen overflow-hidden`}
+        className={`sticky top-0 hidden h-screen shrink-0 overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex ${
+          sidebarCollapsed ? "w-16" : "w-60"
+        }`}
       >
-        <div className="relative flex items-center justify-center px-2 h-20">
+        <div className="relative flex h-20 items-center justify-center px-2">
           <Link to="/" className="flex items-center justify-center" aria-label="Anytrace">
             <img
               src={anytraceLogo}
@@ -95,7 +97,7 @@ export default function AppLayout() {
             size="icon"
             onClick={() => setSidebarCollapsed((value) => !value)}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="absolute top-2 right-2 h-7 w-7"
+            className="absolute right-2 top-2 h-7 w-7"
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
@@ -107,24 +109,24 @@ export default function AppLayout() {
           <div className="p-4">
             <div className="rounded-2xl border border-sidebar-border bg-background/60 px-3 py-3">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Anytrace</p>
-              <p className="text-xs text-sidebar-foreground mt-2 leading-relaxed">
-                Frontend shell without backend, auth, sync routes or seeded data. Ready for a fresh Supabase rebuild.
+              <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground">
+                Live VC data from Supabase plus manual backend triggers for the X scraper.
               </p>
             </div>
           </div>
         )}
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 md:h-16 border-b border-border bg-background flex items-center px-3 md:px-8 gap-2 md:gap-4 sticky top-0 z-20">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background px-3 md:h-16 md:gap-4 md:px-8">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 md:hidden shrink-0" aria-label="Open menu">
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 md:hidden" aria-label="Open menu">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 flex flex-col bg-sidebar">
-              <Link to="/" className="flex items-center justify-center px-4 h-20" aria-label="Anytrace">
+            <SheetContent side="left" className="flex w-64 flex-col bg-sidebar p-0">
+              <Link to="/" className="flex h-20 items-center justify-center px-4" aria-label="Anytrace">
                 <img
                   src={anytraceLogo}
                   alt="Anytrace"
@@ -135,7 +137,9 @@ export default function AppLayout() {
             </SheetContent>
           </Sheet>
 
-          <h1 className="min-w-0 flex-1 text-sm font-medium text-muted-foreground truncate md:flex-none">{active?.label ?? "Anytrace"}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-sm font-medium text-muted-foreground md:flex-none">
+            {active?.label ?? "Anytrace"}
+          </h1>
           <div className="hidden sm:block">
             <AccessBadge />
           </div>
@@ -144,20 +148,20 @@ export default function AppLayout() {
               <button
                 type="button"
                 aria-label="Account"
-                className="h-9 w-9 rounded-full bg-foreground grid place-items-center text-background text-xs font-medium shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto"
+                className="ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-foreground text-xs font-medium text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {session?.user.email?.slice(0, 2).toUpperCase() ?? "AT"}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">{session?.user.email ?? "frontend-only@anytrace.local"}</span>
-                <span className="text-[11px] font-normal text-muted-foreground">Frontend-only workspace</span>
+                <span className="text-sm font-medium">{session?.user.email ?? "local@anytrace.app"}</span>
+                <span className="text-[11px] font-normal text-muted-foreground">Local workspace</span>
               </DropdownMenuLabel>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex-1 min-w-0">
+        <main className="min-w-0 flex-1">
           <div className="border-b border-border bg-background px-3 py-2 sm:hidden">
             <AccessBadge />
           </div>

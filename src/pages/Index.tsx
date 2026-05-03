@@ -85,7 +85,7 @@ function PickCard({
       className="w-full overflow-hidden rounded-[28px] border border-border bg-card p-5 text-left shadow-sm transition-colors hover:border-foreground/20 md:p-6"
     >
       <div className="flex items-start gap-3 sm:gap-4">
-        <div className="w-8 text-[11px] font-mono text-muted-foreground tabular-nums pt-1">
+        <div className="w-8 pt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
           {String(pick.rank).padStart(2, "0")}
         </div>
         <EntityAvatar
@@ -97,19 +97,19 @@ function PickCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h3 className="text-xl font-medium leading-tight break-words">{pick.person.fullName}</h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h3 className="break-words text-xl font-medium leading-tight">{pick.person.fullName}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {pick.person.roleTitle}
                 {pick.person.company ? ` / ${pick.person.company}` : ""}
               </p>
             </div>
             <div className="shrink-0 text-left sm:text-right">
               <div className="font-serif text-4xl leading-none tabular-nums">{pick.score}</div>
-              <div className="text-[11px] text-muted-foreground mt-1">Weekly score</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">Weekly score</div>
             </div>
           </div>
 
-          <p className="text-sm text-foreground/90 mt-4 leading-relaxed">{pick.summary}</p>
+          <p className="mt-4 text-sm leading-relaxed text-foreground/90">{pick.summary}</p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             {pick.reasons.slice(0, 3).map((reason) => (
@@ -140,9 +140,7 @@ function PickCard({
                     </div>
                   ))
                 ) : (
-                  <div className="text-sm text-muted-foreground">
-                    No evidence events are stored for this person yet.
-                  </div>
+                  <div className="text-sm text-muted-foreground">No evidence events are stored for this person yet.</div>
                 )}
               </div>
             </div>
@@ -158,17 +156,35 @@ function PickCard({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {linkedin && (
-                <a href={linkedin.profileUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="text-muted-foreground hover:text-signal-linkedin">
+                <a
+                  href={linkedin.profileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="text-muted-foreground hover:text-signal-linkedin"
+                >
                   <Linkedin className="h-4 w-4" />
                 </a>
               )}
               {x && (
-                <a href={x.profileUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="text-muted-foreground hover:text-foreground">
+                <a
+                  href={x.profileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <Twitter className="h-4 w-4" />
                 </a>
               )}
               {github && (
-                <a href={github.profileUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="text-muted-foreground hover:text-foreground">
+                <a
+                  href={github.profileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <Github className="h-4 w-4" />
                 </a>
               )}
@@ -193,10 +209,7 @@ export default function MainDashboard() {
   const vcsQuery = useVcSources(access.isAuthenticated);
   const identities = useMemo(() => identitiesQuery.data ?? [], [identitiesQuery.data]);
   const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
-  const vcsById = useMemo(
-    () => new Map((vcsQuery.data ?? []).map((vc) => [vc.id, vc])),
-    [vcsQuery.data],
-  );
+  const vcsById = useMemo(() => new Map((vcsQuery.data ?? []).map((vc) => [vc.id, vc])), [vcsQuery.data]);
   const evidenceByPerson = useMemo(() => {
     const grouped = new Map<string, ActivityEvent[]>();
     for (const event of events) {
@@ -222,19 +235,19 @@ export default function MainDashboard() {
       title="Main"
       description="Weekly top picks for venture teams: the people drawing fresh attention from a curated European VC set."
     >
-      <div className="max-w-6xl mx-auto px-4 py-8 md:px-10 md:py-10">
+      <div className="mx-auto max-w-6xl px-4 py-8 md:px-10 md:py-10">
         <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:flex-wrap md:items-end md:justify-between">
           <div>
             <h2 className="font-serif text-4xl leading-[1.02] text-balance md:text-5xl">
               Main <span className="text-muted-foreground">workspace</span>
             </h2>
-            <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">
-              Das bisherige Ranking wurde entfernt. Diese Fläche ist jetzt absichtlich leer, bis wir die neue Datenlogik auf der frischen Supabase-Basis definieren.
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Das Ranking ist noch nicht neu verdrahtet, aber die VC-Datenbasis kommt jetzt direkt aus Supabase.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface-sunken px-4 py-3 md:max-w-sm">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Reset state</div>
-            <div className="text-sm mt-1">Keine Scores, keine Syncs, keine Demo-Daten.</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Current state</div>
+            <div className="mt-1 text-sm">VC-Daten live, Scoring und Picks folgen als Nächstes.</div>
           </div>
         </div>
 
@@ -246,11 +259,11 @@ export default function MainDashboard() {
           </div>
         ) : picksQuery.isError || eventsQuery.isError || vcsQuery.isError ? (
           <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-            Could not load weekly picks.
+            {String(vcsQuery.error || picksQuery.error || eventsQuery.error || "Could not load weekly picks.")}
           </div>
         ) : (picksQuery.data ?? []).length === 0 ? (
           <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-            Es sind aktuell keine Top Picks vorhanden, weil die bisherige Backend- und Seed-Logik vollständig entfernt wurde.
+            Noch keine Top Picks vorhanden. Die VC-Daten sind angebunden, aber Scores und Picks werden noch nicht aus Supabase geladen.
           </div>
         ) : (
           <div className="space-y-4">
@@ -264,9 +277,7 @@ export default function MainDashboard() {
                   .sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime())
                   .slice(0, 5)}
                 expanded={expandedPersonId === pick.person.id}
-                onToggle={() =>
-                  setExpandedPersonId((current) => (current === pick.person.id ? null : pick.person.id))
-                }
+                onToggle={() => setExpandedPersonId((current) => (current === pick.person.id ? null : pick.person.id))}
                 vcsById={vcsById}
               />
             ))}

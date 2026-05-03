@@ -2,14 +2,13 @@ import { Layers3, Sparkles } from "lucide-react";
 
 export function AuthCard() {
   return (
-    <div className="rounded-[28px] border border-border bg-card shadow-sm p-6 md:p-8 max-w-xl">
-      <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-indigo-soft text-foreground mb-5">
+    <div className="max-w-xl rounded-[28px] border border-border bg-card p-6 shadow-sm md:p-8">
+      <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-indigo-soft text-foreground">
         <Sparkles className="h-5 w-5" />
       </div>
-      <h2 className="font-serif text-3xl leading-tight">Frontend-only workspace</h2>
-      <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-        Das bisherige Backend, die Authentifizierung und alle Seed- oder Fallback-Daten wurden entfernt.
-        Diese Oberfläche ist jetzt bewusst nur noch die visuelle Basis für die nächste Logik.
+      <h2 className="font-serif text-3xl leading-tight">Anytrace workspace</h2>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        Die Oberfläche nutzt jetzt Supabase für erste Live-Daten und kann den X-Scraper manuell triggern.
       </p>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface-sunken px-4 py-4 text-sm text-muted-foreground">
@@ -18,7 +17,7 @@ export function AuthCard() {
           Status
         </div>
         <p className="mt-2 leading-relaxed">
-          Sobald wir die neue Supabase-Struktur aufsetzen, können wir Datenmodell, Flows und Sync-Logik von hier aus neu aufbauen.
+          Wenn keine Daten erscheinen, prüfe zuerst `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` und deine RLS-Regeln.
         </p>
       </div>
     </div>
