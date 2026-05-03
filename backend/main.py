@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 
 from backend.alerts.email_alert import EmailAlertService
-from backend.config import get_settings
 from backend.db import SupabaseDB
 from backend.engine.news_engine import NewsEngine
 from backend.engine.score_engine import ScoreEngine
@@ -15,9 +15,9 @@ from backend.scrapers.twitter_scraper import TwitterFollowingScraper
 
 
 def configure_logging() -> None:
-    settings = get_settings()
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
-from backend.config import Settings, get_settings
+from backend.config import Settings, get_settings, validate_settings
 from backend.db import SupabaseDB, normalize_handle, utc_now
 from scrape_following import scrape_following
 
@@ -25,6 +25,7 @@ class TwitterRunResult:
 class TwitterFollowingScraper:
     def __init__(self, db: SupabaseDB | None = None, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        validate_settings(self.settings, "supabase", "twitter")
         self.db = db or SupabaseDB.from_settings(self.settings)
 
     def _output_path_for_vc(self, vc: dict[str, str]) -> str:

@@ -8,7 +8,7 @@ from datetime import date
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
-from backend.config import Settings, get_settings
+from backend.config import Settings, get_settings, validate_settings
 from backend.db import SupabaseDB, normalize_linkedin_url
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ class LinkedInScraper:
 
     def __init__(self, db: SupabaseDB | None = None, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        validate_settings(self.settings, "supabase", "linkedin")
         self.db = db or SupabaseDB.from_settings(self.settings)
 
     def _login(self, page: Page) -> None:

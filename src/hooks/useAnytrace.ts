@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   ActivityEvent,
   GraphData,
@@ -12,6 +12,7 @@ import type {
   WatchlistData,
   WeeklyPick,
 } from "@/data/anytrace";
+import { fetchGraphData, fetchVcSources, hasFrontendSupabaseConfig } from "@/lib/supabaseRest";
 
 type LocalSession = {
   user: {
@@ -106,13 +107,43 @@ export function useManualSync() {
   });
 }
 
+export function useRunTwitterScrape() {
+  return useStaticMutation(async () => {
+    const response = await fetch("/api/run-twitter", {
+      method: "POST",
+    });
+
+    const payload = (await response.json()) as {
+      ok: boolean;
+      error?: string;
+      count?: number;
+      results?: Array<{
+        vc_name: string;
+        baseline_run: boolean;
+        new_snapshot_count: number;
+        matched_candidate_count: number;
+        stopped_early: boolean;
+        output_file: string;
+      }>;
+    };
+
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || "Twitter scrape could not be started.");
+    }
+
+    return payload;
+  });
+}
+
 export function useVcSources(_enabled = true) {
-  return {
-    data: [] as VcSource[],
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+  const enabled = _enabled && hasFrontendSupabaseConfig();
+
+  return useQuery({
+    queryKey: ["anytrace", "vcs"],
+    queryFn: fetchVcSources,
+    enabled,
+    staleTime: 60_000,
+  });
 }
 
 export function useSelectedVcWatchlist(_enabled = true) {
@@ -223,13 +254,19 @@ export function useRemoveGithubPersonFromWatchlist() {
 }
 
 export function useGraphData(_enabled = true) {
+  const enabled = _enabled && hasFrontendSupabaseConfig();
+  const query = useQuery({
+    queryKey: ["anytrace", "graph"],
+    queryFn: fetchGraphData,
+    enabled,
+    staleTime: 60_000,
+  });
+
   return useMemo(
     () => ({
-      data: EMPTY_GRAPH as GraphData,
-      isLoading: false,
-      isError: false,
-      error: null,
+      ...query,
+      data: (query.data ?? EMPTY_GRAPH) as GraphData,
     }),
-    [],
+    [query],
   );
 }

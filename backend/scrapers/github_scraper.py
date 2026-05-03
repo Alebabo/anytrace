@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import requests
 
-from backend.config import Settings, get_settings
+from backend.config import Settings, get_settings, validate_settings
 from backend.db import SupabaseDB
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class GithubScraper:
 
     def __init__(self, db: SupabaseDB | None = None, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        validate_settings(self.settings, "supabase", "github")
         self.db = db or SupabaseDB.from_settings(self.settings)
         self.session = requests.Session()
         self.session.headers.update(

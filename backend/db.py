@@ -7,7 +7,7 @@ from typing import Any
 
 from supabase import Client, create_client
 
-from backend.config import Settings, get_settings
+from backend.config import Settings, get_settings, validate_settings
 
 logger = logging.getLogger(__name__)
 UTC = timezone.utc
@@ -43,6 +43,7 @@ class SupabaseDB:
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> "SupabaseDB":
         cfg = settings or get_settings()
+        validate_settings(cfg, "supabase")
         return cls(create_client(cfg.supabase_url, cfg.supabase_key))
 
     def _fetch_all(self, table: str, *, page_size: int = 1000) -> list[dict[str, Any]]:

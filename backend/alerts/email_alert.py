@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 
-from backend.config import Settings, get_settings
+from backend.config import Settings, get_settings, validate_settings
 from backend.db import SupabaseDB
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,7 @@ class EmailAlertService:
     @classmethod
     def build(cls, db: SupabaseDB | None = None, settings: Settings | None = None) -> "EmailAlertService":
         cfg = settings or get_settings()
+        validate_settings(cfg, "supabase", "smtp")
         return cls(db or SupabaseDB.from_settings(cfg), cfg)
 
     def _compose_email(self, candidate: dict, score: dict) -> EmailMessage:
