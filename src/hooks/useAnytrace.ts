@@ -332,7 +332,14 @@ function computeAccessState(subscription: SubRow | null, session: Session | null
   };
 }
 
-async function callServerApi<T>(session: Session | null, path: string, body?: Record<string, unknown>) {
+async function getFreshSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session ?? null;
+}
+
+async function callServerApi<T>(path: string, body?: Record<string, unknown>) {
+  const session = await getFreshSession();
   if (!session?.access_token) {
     throw new Error("You need to be signed in to run this sync.");
   }
@@ -538,7 +545,7 @@ export function useSignOut() {
 
 export function useManualSync() {
   const qc = useQueryClient();
-  const { session, demoMode } = useAccessState();
+  const demoMode = useDemoMode();
 
   return useMutation({
     mutationFn: async (target: "x" | "github" | "media-backfill" | "all") => {
@@ -555,9 +562,9 @@ export function useManualSync() {
       }
 
       if (target === "all") {
-        const xResult = await callServerApi<Record<string, unknown>>(session, "/api/sync/x");
-        const githubResult = await callServerApi<Record<string, unknown>>(session, "/api/sync/github");
-        const mediaResult = await callServerApi<Record<string, unknown>>(session, "/api/sync/media-backfill");
+        const xResult = await callServerApi<Record<string, unknown>>("/api/sync/x");
+        const githubResult = await callServerApi<Record<string, unknown>>("/api/sync/github");
+        const mediaResult = await callServerApi<Record<string, unknown>>("/api/sync/media-backfill");
         return {
           x: xResult,
           github: githubResult,
@@ -565,7 +572,7 @@ export function useManualSync() {
         };
       }
 
-      return await callServerApi<Record<string, unknown>>(session, `/api/sync/${target}`);
+      return await callServerApi<Record<string, unknown>>(`/api/sync/${target}`);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["vc-sources"] });
