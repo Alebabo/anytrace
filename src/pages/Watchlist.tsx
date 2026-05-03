@@ -2,6 +2,7 @@ import { Github, Linkedin, Trash2, Twitter } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -206,7 +207,7 @@ export default function WatchlistPage() {
                     </div>
                   ) : selectedVcs.length === 0 ? (
                     <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                      No VCs selected yet. Add one from the VC dropdown above.
+                      No VCs selected yet.
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -233,7 +234,7 @@ export default function WatchlistPage() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-5">
-                  {watchlistQuery.isLoading || peopleQuery.isLoading || identitiesQuery.isLoading ? (
+                  {watchlistQuery.isLoading || identitiesQuery.isLoading ? (
                     <div className="space-y-3">
                       {Array.from({ length: 4 }).map((_, index) => (
                         <Skeleton key={index} className="h-20 w-full rounded-[28px]" />
@@ -241,7 +242,7 @@ export default function WatchlistPage() {
                     </div>
                   ) : selectedGithubPeople.length === 0 ? (
                     <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                      No Git people selected yet. Add someone from the second dropdown or create a manual entry.
+                      No Git people selected yet.
                     </div>
                   ) : (
                     <div className="space-y-3">
