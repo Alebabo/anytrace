@@ -24,6 +24,15 @@ export const env = {
   stripeProPriceUsd: Math.max(1, Number(process.env.STRIPE_PRO_PRICE_USD ?? "19")),
 };
 
+const requiredEnvLabels = {
+  supabaseUrl: "NEXT_PUBLIC_SUPABASE_URL or VITE_SUPABASE_URL or SUPABASE_URL",
+  supabaseServiceRoleKey: "SUPABASE_SERVICE_ROLE_KEY",
+  twitterApiKey: "TWITTERAPI_IO_KEY",
+  githubToken: "GITHUB_TOKEN",
+  stripeSecretKey: "STRIPE_SECRET_KEY",
+  stripeWebhookSecret: "STRIPE_WEBHOOK_SECRET",
+} as const;
+
 export function requireEnv(
   name:
     | "supabaseUrl"
@@ -35,7 +44,7 @@ export function requireEnv(
 ) {
   const value = env[name];
   if (value === "" || value === null || value === undefined) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new Error(`Missing required environment variable: ${requiredEnvLabels[name]}`);
   }
   return value;
 }

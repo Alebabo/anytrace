@@ -104,6 +104,9 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                 Use these buttons when you want to refresh X follows, viral GitHub repos, or avatar backfills. Each run calls the protected Vercel API with your current Supabase session.
               </p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Required on the server for live syncs: `SUPABASE_SERVICE_ROLE_KEY`, `TWITTERAPI_IO_KEY`, and `GITHUB_TOKEN`.
+              </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Button
                   className="rounded-full"

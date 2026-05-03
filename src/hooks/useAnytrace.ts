@@ -362,12 +362,23 @@ async function callServerApi<T>(path: string, body?: Record<string, unknown>) {
     body: JSON.stringify(body ?? {}),
   });
 
-  const payload = (await response.json().catch(() => null)) as T | { error?: string } | null;
+  const rawText = await response.text();
+  const payload = rawText
+    ? ((() => {
+        try {
+          return JSON.parse(rawText) as T | { error?: string; details?: string } | null;
+        } catch {
+          return null;
+        }
+      })())
+    : null;
   if (!response.ok) {
     const message =
       payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
         ? payload.error
-        : `Request failed with status ${response.status}`;
+        : rawText.trim()
+          ? `${path} failed with status ${response.status}: ${rawText.trim().slice(0, 240)}`
+          : `${path} failed with status ${response.status}`;
     throw new Error(message);
   }
 
