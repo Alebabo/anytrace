@@ -242,6 +242,32 @@ function computeAccessState(subscription: SubRow | null, session: Session | null
   };
 }
 
+async function callServerApi<T>(session: Session | null, path: string, body?: Record<string, unknown>) {
+  if (!session?.access_token) {
+    throw new Error("You need to be signed in to run this sync.");
+  }
+
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+
+  const payload = (await response.json().catch(() => null)) as T | { error?: string } | null;
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+        ? payload.error
+        : `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
 export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -343,9 +369,10 @@ export function useAccessState() {
 export function useMagicLinkSignIn() {
   return useMutation({
     mutationFn: async (email: string) => {
-      const redirectTo =
+      const siteUrl =
         (import.meta.env.VITE_SITE_URL as string | undefined)?.trim() ||
         window.location.origin;
+      const redirectTo = new URL("/auth/confirm", siteUrl).toString();
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: redirectTo },
@@ -373,6 +400,40 @@ export function useSignOut() {
     },
     onSuccess: () => {
       qc.clear();
+    },
+  });
+}
+
+export function useManualSync() {
+  const qc = useQueryClient();
+  const { session, demoMode } = useAccessState();
+
+  return useMutation({
+    mutationFn: async (target: "x" | "github" | "media-backfill" | "all") => {
+      if (demoMode) {
+        throw new Error("Manual sync is unavailable in demo mode.");
+      }
+
+      if (target === "all") {
+        const xResult = await callServerApi<Record<string, unknown>>(session, "/api/sync/x");
+        const githubResult = await callServerApi<Record<string, unknown>>(session, "/api/sync/github");
+        const mediaResult = await callServerApi<Record<string, unknown>>(session, "/api/sync/media-backfill");
+        return {
+          x: xResult,
+          github: githubResult,
+          mediaBackfill: mediaResult,
+        };
+      }
+
+      return await callServerApi<Record<string, unknown>>(session, `/api/sync/${target}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vc-sources"] });
+      qc.invalidateQueries({ queryKey: ["tracked-people"] });
+      qc.invalidateQueries({ queryKey: ["person-identities"] });
+      qc.invalidateQueries({ queryKey: ["activity-events"] });
+      qc.invalidateQueries({ queryKey: ["selected-vc-watchlist"] });
+      qc.invalidateQueries({ queryKey: ["graph-data"] });
     },
   });
 }

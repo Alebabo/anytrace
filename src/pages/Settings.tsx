@@ -1,9 +1,10 @@
-import { CalendarClock, CreditCard, Mail, Shield } from "lucide-react";
+import { CalendarClock, CreditCard, Mail, RefreshCcw, Shield } from "lucide-react";
+import { toast } from "sonner";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { AuthCard } from "@/components/anytrace/AuthCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useAccessState, useSignOut } from "@/hooks/useAnytrace";
+import { useAccessState, useManualSync, useSignOut } from "@/hooks/useAnytrace";
 
 function InfoRow({ icon: Icon, label, value }: { icon: typeof Mail; label: string; value: string }) {
   return (
@@ -20,6 +21,18 @@ function InfoRow({ icon: Icon, label, value }: { icon: typeof Mail; label: strin
 export default function SettingsPage() {
   const { session, access, subscription, demoMode } = useAccessState();
   const signOut = useSignOut();
+  const manualSync = useManualSync();
+
+  const runSync = (target: "x" | "github" | "media-backfill" | "all", label: string) => {
+    manualSync.mutate(target, {
+      onSuccess: () => {
+        toast.success(`${label} finished.`);
+      },
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : `Could not run ${label.toLowerCase()}.`);
+      },
+    });
+  };
 
   if (!access.isAuthenticated) {
     return (
@@ -77,6 +90,59 @@ export default function SettingsPage() {
               </div>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                 The subscription model is already in Supabase and the UI gates access after trial expiry. The next step is connecting Stripe customer creation, checkout, and webhook-driven status sync.
+              </p>
+            </div>
+          </Card>
+
+          <Card className="rounded-[28px] border-border p-6 shadow-none">
+            <h3 className="text-base font-medium mb-4">Manual sync</h3>
+            <div className="rounded-2xl bg-surface-sunken px-4 py-4">
+              <div className="flex items-center gap-3 text-sm">
+                <RefreshCcw className="h-4 w-4 text-muted-foreground" />
+                Syncs now run on demand from the dashboard instead of Vercel Cron.
+              </div>
+              <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                Use these buttons when you want to refresh X follows, viral GitHub repos, or avatar backfills. Each run calls the protected Vercel API with your current Supabase session.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button
+                  className="rounded-full"
+                  disabled={manualSync.isPending || demoMode}
+                  onClick={() => runSync("all", "Full sync")}
+                >
+                  Run full sync
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={manualSync.isPending || demoMode}
+                  onClick={() => runSync("x", "X sync")}
+                >
+                  Sync X
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={manualSync.isPending || demoMode}
+                  onClick={() => runSync("github", "GitHub sync")}
+                >
+                  Sync GitHub
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={manualSync.isPending || demoMode}
+                  onClick={() => runSync("media-backfill", "Media backfill")}
+                >
+                  Run media backfill
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                {demoMode
+                  ? "Manual sync is disabled in demo mode."
+                  : manualSync.isPending
+                    ? "Sync in progress..."
+                    : "No automatic schedule is configured in Vercel."}
               </p>
             </div>
           </Card>

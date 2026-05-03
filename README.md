@@ -52,12 +52,12 @@ The repo now includes Vercel API routes for ingest and billing:
 The sync routes accept either:
 
 - a signed-in Supabase bearer token for manual runs
-- Vercel Cron requests
-- `x-cron-secret: $CRON_SECRET` for non-Cron manual automation
+- `x-cron-secret: $CRON_SECRET` for external automation if you ever re-enable it
 
 Required server-side env vars:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `TWITTERAPI_IO_KEY`
 - `GITHUB_TOKEN`
@@ -73,9 +73,8 @@ Useful optional env vars:
 - `GITHUB_SEARCH_RESULT_LIMIT`
 - `GITHUB_VIRAL_STAR_DELTA_THRESHOLD`
 - `STRIPE_PRO_PRICE_USD`
-- `CRON_SECRET`
 
-`vercel.json` schedules the three sync routes daily by default.
+The current app uses manual sync buttons in Settings. No Vercel Cron schedule is configured.
 
 ## Notes
 
