@@ -1,1 +1,4 @@
--r backend/requirements.txt
+APScheduler>=3.10,<4
+playwright>=1.52,<2
+requests>=2.32,<3
+supabase>=2.15,<3
