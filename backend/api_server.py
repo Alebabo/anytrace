@@ -180,12 +180,15 @@ def _twitter_state_payload() -> dict[str, Any]:
     db = SupabaseDB.from_settings(settings)
     state_store = create_twitter_state_store(settings, db)
     snapshots = state_store.list_twitter_snapshots()
+    tracked_person_snapshots = db.list_tracked_person_twitter_snapshots()
 
     return {
         "ok": True,
         "backend": settings.twitter_state_backend,
         "snapshot_count": len(snapshots),
         "snapshots": snapshots,
+        "tracked_person_snapshot_count": len(tracked_person_snapshots),
+        "tracked_person_snapshots": tracked_person_snapshots,
     }
 
 

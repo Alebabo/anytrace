@@ -59,6 +59,14 @@ type RawTwitterSnapshotRow = {
   created_at: string | null;
 };
 
+type RawTrackedPersonTwitterSnapshotRow = {
+  id: string;
+  tracked_person_id: string | null;
+  followed_handle: string | null;
+  first_seen_at: string | null;
+  created_at: string | null;
+};
+
 type RawGithubRepoSnapshotRow = {
   id: string;
   tracked_person_id: string | null;
@@ -187,6 +195,7 @@ type SignalBundle = {
   trackedGitPeople: RawTrackedGitPersonRow[];
   githubObservedPeople: RawGithubObservedPersonRow[];
   twitterSnapshots: RawTwitterSnapshotRow[];
+  trackedPersonTwitterSnapshots: RawTrackedPersonTwitterSnapshotRow[];
   githubRepoSnapshots: RawGithubRepoSnapshotRow[];
   githubPersonEvents: RawGithubPersonEventRow[];
   githubFollowRelationships: RawGithubFollowRelationshipRow[];
@@ -213,6 +222,8 @@ type TwitterStatePayload = {
   backend?: string;
   snapshot_count?: number;
   snapshots?: RawTwitterSnapshotRow[];
+  tracked_person_snapshot_count?: number;
+  tracked_person_snapshots?: RawTrackedPersonTwitterSnapshotRow[];
 };
 
 const SIGNAL_CACHE_TTL_MS = 10_000;
@@ -573,7 +584,10 @@ async function fetchGithubRepoSnapshots(): Promise<RawGithubRepoSnapshotRow[]> {
   });
 }
 
-async function fetchTwitterSnapshotsFromBackend(): Promise<RawTwitterSnapshotRow[] | null> {
+async function fetchTwitterSnapshotsFromBackend(): Promise<{
+  snapshots: RawTwitterSnapshotRow[];
+  trackedPersonSnapshots: RawTrackedPersonTwitterSnapshotRow[];
+} | null> {
   const endpoint = `${getBackendBaseUrl()}/twitter-state`;
   try {
     const response = await fetch(endpoint);
@@ -584,22 +598,40 @@ async function fetchTwitterSnapshotsFromBackend(): Promise<RawTwitterSnapshotRow
     if (!payload.ok || !Array.isArray(payload.snapshots)) {
       return null;
     }
-    return payload.snapshots;
+    return {
+      snapshots: payload.snapshots,
+      trackedPersonSnapshots: Array.isArray(payload.tracked_person_snapshots)
+        ? payload.tracked_person_snapshots
+        : [],
+    };
   } catch {
     return null;
   }
 }
 
 async function loadSignalBundleUncached(): Promise<SignalBundle> {
-  const twitterSnapshotsPromise = fetchTwitterSnapshotsFromBackend().then((rows) => {
-    if (rows) {
-      return rows;
+  const twitterStatePromise = fetchTwitterSnapshotsFromBackend().then(async (payload) => {
+    if (payload) {
+      return payload;
     }
-    return supabaseSelectOptional<RawTwitterSnapshotRow>(
-      "twitter_following_snapshots",
-      "id,vc_id,followed_handle,first_seen_at,created_at",
-      "first_seen_at.desc,created_at.desc",
-    );
+
+    const [snapshots, trackedPersonSnapshots] = await Promise.all([
+      supabaseSelectOptional<RawTwitterSnapshotRow>(
+        "twitter_following_snapshots",
+        "id,vc_id,followed_handle,first_seen_at,created_at",
+        "first_seen_at.desc,created_at.desc",
+      ),
+      supabaseSelectOptional<RawTrackedPersonTwitterSnapshotRow>(
+        "tracked_person_twitter_following_snapshots",
+        "id,tracked_person_id,followed_handle,first_seen_at,created_at",
+        "first_seen_at.desc,created_at.desc",
+      ),
+    ]);
+
+    return {
+      snapshots,
+      trackedPersonSnapshots,
+    };
   });
 
   const [
@@ -607,7 +639,7 @@ async function loadSignalBundleUncached(): Promise<SignalBundle> {
     candidates,
     trackedGitPeople,
     githubObservedPeople,
-    twitterSnapshots,
+    twitterState,
     githubRepoSnapshots,
     githubPersonEvents,
     githubFollowRelationships,
@@ -632,7 +664,7 @@ async function loadSignalBundleUncached(): Promise<SignalBundle> {
       "id,source_tracked_person_id,relationship_type,github_username,name,profile_url,avatar_url,bio,company,location,blog_url,twitter_handle,followers_count,following_count,public_repos_count,indicator_count,can_add_to_watchlist,added_to_watchlist,first_seen_at,last_seen_at,created_at",
       "indicator_count.desc,last_seen_at.desc,created_at.desc",
     ),
-    twitterSnapshotsPromise,
+    twitterStatePromise,
     fetchGithubRepoSnapshots(),
     supabaseSelectOptional<RawGithubPersonEventRow>(
       "github_person_events",
@@ -666,12 +698,16 @@ async function loadSignalBundleUncached(): Promise<SignalBundle> {
     ),
   ]);
 
+  const twitterSnapshots = twitterState.snapshots;
+  const trackedPersonTwitterSnapshots = twitterState.trackedPersonSnapshots;
+
   return {
     vcs,
     candidates,
     trackedGitPeople,
     githubObservedPeople,
     twitterSnapshots,
+    trackedPersonTwitterSnapshots,
     githubRepoSnapshots,
     githubPersonEvents,
     githubFollowRelationships,
@@ -1368,6 +1404,100 @@ function deriveSignals(bundle: SignalBundle): DerivedSignals {
         eventFingerprint: row.id,
       });
     }
+  });
+
+  bundle.trackedPersonTwitterSnapshots.forEach((row) => {
+    const handle = humanizeHandle(row.followed_handle);
+    const normalizedHandle = handle.toLowerCase();
+    if (!row.tracked_person_id || !handle) {
+      filteredConnectionCount += 1;
+      return;
+    }
+
+    const sourcePerson = peopleById.get(row.tracked_person_id);
+    if (!sourcePerson) {
+      filteredConnectionCount += 1;
+      return;
+    }
+
+    const trackedGitPerson = trackedByTwitter.get(normalizedHandle) || null;
+    const personId =
+      resolveCanonicalPersonIdByIdentity({
+        xHandle: handle,
+      }) ||
+      trackedGitPerson?.id ||
+      `snapshot-${normalizedHandle}`;
+
+    if (!peopleById.has(personId)) {
+      peopleById.set(
+        personId,
+        mapSnapshotTrackedPerson({
+          personId,
+          handle,
+          connectionCount: handleConnectionCount.get(normalizedHandle) ?? 1,
+        }),
+      );
+      registerPersonIdentityAlias(personId, "x", handle);
+    }
+
+    if (!knownXHandles.has(normalizedHandle)) {
+      const identityId = `${personId}-x`;
+      if (!knownIdentityIds.has(identityId)) {
+        identities.push({
+          id: identityId,
+          personId,
+          platform: "x",
+          handle,
+          profileUrl: `https://x.com/${handle}`,
+          isPrimary: true,
+        });
+        knownIdentityIds.add(identityId);
+        knownXHandles.add(normalizedHandle);
+      }
+    }
+    registerPersonIdentityAlias(personId, "x", handle);
+
+    graphPersonIds.add(row.tracked_person_id);
+    graphPersonIds.add(personId);
+
+    const occurredAt =
+      startOfDayIso(row.first_seen_at) ||
+      startOfDayIso(row.created_at) ||
+      new Date().toISOString();
+
+    graphEdges.push({
+      id: `tracked-x-${row.id}`,
+      sourceId: row.tracked_person_id,
+      targetId: personId,
+      platform: "x",
+      eventCount: 1,
+      isTopPick: false,
+      graphSource: "event",
+      firstObservedAt: row.first_seen_at || row.created_at,
+      isRecent: isWithinDays(row.first_seen_at, 7),
+      followerCount: 1,
+    });
+
+    activityEvents.push({
+      id: `tracked-x-${row.id}`,
+      personId,
+      vcSourceId: null,
+      platform: "x",
+      eventType: "mention",
+      headline: `${sourcePerson.fullName} follows ${peopleById.get(personId)?.fullName || handle} on X`,
+      description: `${sourcePerson.fullName} is connected to ${peopleById.get(personId)?.fullName || handle} through tracked GitHub-person X scanning.`,
+      sourceUrl: `https://x.com/${handle}`,
+      occurredAt,
+      metadata: {
+        actorLabel: sourcePerson.fullName,
+        targetLabel: handle,
+        followedHandle: handle,
+        firstSeenAt: row.first_seen_at,
+        createdAt: row.created_at,
+        sourceTrackedPersonId: row.tracked_person_id,
+      },
+      eventFingerprint: `tracked-x-${row.id}`,
+    });
   });
 
   githubProfilesByPerson.forEach((profile, personId) => {

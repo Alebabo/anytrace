@@ -21,7 +21,7 @@ import {
   useVcSources,
 } from "@/hooks/useAnytrace";
 import type { PersonIdentity, VcSource } from "@/data/anytrace";
-import { avatarSourcesForPerson } from "@/lib/avatarSources";
+import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
@@ -65,15 +65,6 @@ function scoreForDossier(watchers: number, stars: number, delta: number, socials
 
 function confidenceForDossier(watchers: number, hasGithub: boolean, socials: number) {
   return Math.min(98, 76 + watchers * 5 + socials * 3 + (hasGithub ? 8 : 0));
-}
-
-function initialsForName(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
 }
 
 function DossierMark({ letter }: { letter: string }) {
@@ -224,6 +215,7 @@ export default function ConnectionDetail() {
   const eventsData = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
   const vcs = useMemo(() => vcsQuery.data ?? [], [vcsQuery.data]);
   const vcsById = useMemo(() => new Map(vcs.map((vc) => [vc.id, vc])), [vcs]);
+  const graphEdges = useMemo(() => graphQuery.data?.edges ?? [], [graphQuery.data?.edges]);
 
   const person = useMemo(() => graphPeople.find((entry) => entry.id === id) ?? null, [graphPeople, id]);
   const identities = useMemo(() => identitiesData.filter((entry) => entry.personId === id), [identitiesData, id]);
@@ -252,18 +244,23 @@ export default function ConnectionDetail() {
   const linkedinIdentity = identityFor(socialIdentities, "linkedin");
 
   const networkPeople = useMemo(() => {
-    const unique = new Map<string, { vc: VcSource; occurredAt: string }>();
-    for (const event of sortedEvents) {
-      if (!event.vcSourceId) continue;
-      const vc = vcsById.get(event.vcSourceId);
+    const unique = new Map<string, { vc: VcSource; occurredAt: string | null }>();
+    for (const edge of graphEdges) {
+      if (edge.targetId !== id) continue;
+      const vc = vcsById.get(edge.sourceId);
       if (!vc || unique.has(vc.id)) continue;
       unique.set(vc.id, {
         vc,
-        occurredAt: event.occurredAt,
+        occurredAt: edge.firstObservedAt || null,
       });
     }
-    return [...unique.values()];
-  }, [sortedEvents, vcsById]);
+
+    return [...unique.values()].sort((left, right) => {
+      const leftTime = left.occurredAt ? new Date(left.occurredAt).getTime() : 0;
+      const rightTime = right.occurredAt ? new Date(right.occurredAt).getTime() : 0;
+      return leftTime - rightTime;
+    });
+  }, [graphEdges, id, vcsById]);
 
   const dossierScore = scoreForDossier(
     networkPeople.length,
@@ -308,7 +305,7 @@ export default function ConnectionDetail() {
     }
 
     return rows.slice(0, 3);
-  }, [githubIdentity?.profileUrl, githubProfile, networkPeople, sortedEvents]);
+  }, [githubIdentity?.profileUrl, githubProfile, sortedEvents]);
 
   const dossierFacts = useMemo(() => {
     if (!person) return [] as DossierFact[];
@@ -354,7 +351,6 @@ export default function ConnectionDetail() {
   const trackingWindow = useMemo(() => {
     const timestamps = [
       githubProfile?.snapshotDate,
-      ...sortedEvents.map((event) => event.occurredAt),
       ...networkPeople.map((entry) => entry.occurredAt),
     ]
       .map((value) => (value ? new Date(value).getTime() : Number.NaN))
@@ -363,14 +359,14 @@ export default function ConnectionDetail() {
     if (timestamps.length === 0) return null;
 
     const earliest = new Date(Math.min(...timestamps)).toISOString();
-    const latest = new Date(Math.max(...timestamps)).toISOString();
+    const latest = new Date().toISOString();
     const earliestLabel = formatTrackingDate(earliest);
     const latestLabel = formatTrackingDate(latest);
 
     if (!earliestLabel) return null;
     if (!latestLabel || earliestLabel === latestLabel) return `Tracking since ${earliestLabel}`;
     return `Tracking window ${earliestLabel} - ${latestLabel}`;
-  }, [githubProfile?.snapshotDate, networkPeople, sortedEvents]);
+  }, [githubProfile?.snapshotDate, networkPeople]);
 
   return (
     <ProductGate>
@@ -540,9 +536,7 @@ export default function ConnectionDetail() {
                             key={vc.id}
                             className="flex items-center gap-4 rounded-[22px] border border-[#dfddd5] bg-[#f3f1eb] px-4 py-4 transition-shadow hover:shadow-[0_8px_18px_rgba(20,20,20,0.05)]"
                           >
-                            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#505050] text-sm font-semibold text-white">
-                              {initialsForName(vc.name)}
-                            </div>
+                            <EntityAvatar name={vc.name} imageUrls={avatarSourcesForVc(vc)} size={48} className="shrink-0 rounded-full" />
                             <div className="min-w-0">
                               <div className="truncate text-[15px] font-semibold text-[#1f1f1d]">{vc.name}</div>
                               <div className="mt-1 text-sm text-[#7a766e]">{vc.firm || vc.title || "Tracked VC"}</div>

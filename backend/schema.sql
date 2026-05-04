@@ -118,6 +118,13 @@ create table if not exists twitter_vc_cursors (
   last_run_at timestamptz default now()
 );
 
+create table if not exists tracked_person_twitter_cursors (
+  id uuid primary key default gen_random_uuid(),
+  tracked_person_id uuid references tracked_git_people(id) on delete cascade unique,
+  last_known_handle text,
+  last_run_at timestamptz default now()
+);
+
 create table if not exists twitter_vc_follows (
   id uuid primary key default gen_random_uuid(),
   candidate_id uuid references candidates(id) on delete cascade,
@@ -125,6 +132,15 @@ create table if not exists twitter_vc_follows (
   first_seen_at date,
   last_seen_at date,
   unique(candidate_id, vc_id)
+);
+
+create table if not exists tracked_person_twitter_following_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  tracked_person_id uuid references tracked_git_people(id) on delete cascade,
+  followed_handle text,
+  first_seen_at date,
+  created_at timestamptz default now(),
+  unique(tracked_person_id, followed_handle)
 );
 
 create table if not exists github_repo_snapshots (

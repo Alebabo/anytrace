@@ -37,6 +37,10 @@ class TwitterFollowingScraper:
         slug = normalize_handle(vc.get("twitter_handle")) or vc["id"]
         return str(Path("backend") / "outputs" / f"following_{slug}.csv")
 
+    def _output_path_for_tracked_person(self, person: dict[str, str]) -> str:
+        slug = normalize_handle(person.get("twitter_handle")) or person["id"]
+        return str(Path("backend") / "outputs" / f"following_git_{slug}.csv")
+
     def process_vc(self, vc: dict) -> TwitterRunResult:
         vc_id = vc["id"]
         twitter_handle = normalize_handle(vc.get("twitter_handle"))
@@ -140,6 +144,90 @@ class TwitterFollowingScraper:
             output_file=fetch_result.output_file,
         )
 
+    def process_tracked_person(self, person: dict) -> TwitterRunResult:
+        tracked_person_id = person["id"]
+        twitter_handle = normalize_handle(person.get("twitter_handle"))
+        if not twitter_handle:
+            raise RuntimeError(f"Tracked git person '{person['name']}' has no twitter_handle")
+
+        cursor_row = self.db.get_tracked_person_twitter_cursor(tracked_person_id)
+        snapshot_count = self.db.count_tracked_person_twitter_snapshots(tracked_person_id)
+        last_known_handle = normalize_handle(cursor_row["last_known_handle"]) if cursor_row else None
+        baseline_run = last_known_handle is None and snapshot_count == 0
+        baseline_first_seen_at = date.today() - timedelta(days=8)
+        output_file = self._output_path_for_tracked_person(person)
+
+        logger.info(
+            "Scraping following list for tracked git person %s (@%s), baseline=%s",
+            person["name"],
+            twitter_handle,
+            baseline_run,
+        )
+        fetch_result = self._fetch_rows_for_vc(
+            vc_id=tracked_person_id,
+            twitter_handle=twitter_handle,
+            output_file=output_file,
+            last_known_handle=last_known_handle,
+            baseline_run=baseline_run,
+        )
+        rows = fetch_result.rows
+
+        tracked_handles = self.db.get_tracked_twitter_handles()
+        protected_handles = set(tracked_handles)
+        total_snapshot_count = self.db.count_all_tracked_person_twitter_snapshots()
+        snapshot_max_rows = max(self.settings.twitter_snapshot_max_rows, 0)
+        unlimited_snapshots = snapshot_max_rows == 0
+        snapshot_first_seen_at = baseline_first_seen_at if baseline_run else date.today()
+        new_handles: list[str] = []
+        stopped_early = fetch_result.stopped_early
+        page_one_first_handle = normalize_handle(rows[0]["username"]) if rows else None
+
+        for row in rows:
+            handle = normalize_handle(row.get("username"))
+            if not handle:
+                continue
+
+            snapshot_exists = self.db.tracked_person_twitter_snapshot_exists(tracked_person_id, handle)
+            should_store_snapshot = (
+                unlimited_snapshots
+                or snapshot_exists
+                or handle in tracked_handles
+                or total_snapshot_count < snapshot_max_rows
+            )
+            if should_store_snapshot:
+                self.db.upsert_tracked_person_twitter_snapshot(
+                    tracked_person_id,
+                    handle,
+                    snapshot_first_seen_at,
+                )
+                if not snapshot_exists:
+                    total_snapshot_count += 1
+            new_handles.append(handle)
+
+        if page_one_first_handle:
+            self.db.upsert_tracked_person_twitter_cursor(tracked_person_id, page_one_first_handle, utc_now())
+
+        if not unlimited_snapshots:
+            deleted_snapshot_count = self.db.prune_tracked_person_twitter_snapshots(
+                max_rows=snapshot_max_rows,
+                protected_handles=protected_handles,
+            )
+            if deleted_snapshot_count > 0:
+                logger.info(
+                    "Pruned %s tracked git twitter snapshot rows to stay within TWITTER_SNAPSHOT_MAX_ROWS=%s",
+                    deleted_snapshot_count,
+                    snapshot_max_rows,
+                )
+
+        return TwitterRunResult(
+            vc_name=person["name"],
+            baseline_run=baseline_run,
+            new_snapshot_count=len(new_handles),
+            matched_candidate_count=0,
+            stopped_early=stopped_early,
+            output_file=fetch_result.output_file,
+        )
+
     def run_all(self) -> list[TwitterRunResult]:
         results: list[TwitterRunResult] = []
         skipped_no_handle = 0
@@ -155,6 +243,17 @@ class TwitterFollowingScraper:
             except Exception:
                 failed += 1
                 logger.exception("Twitter scrape failed for VC %s", vc["name"])
+        for person in self.db.list_tracked_git_people_with_twitter():
+            twitter_handle = normalize_handle(person.get("twitter_handle"))
+            if not twitter_handle:
+                logger.info("Skipping tracked git person %s because twitter_handle is empty.", person["name"])
+                skipped_no_handle += 1
+                continue
+            try:
+                results.append(self.process_tracked_person(person))
+            except Exception:
+                failed += 1
+                logger.exception("Twitter scrape failed for tracked git person %s", person["name"])
         logger.info(
             "Twitter scrape summary: %s succeeded, %s skipped without handle, %s failed.",
             len(results),

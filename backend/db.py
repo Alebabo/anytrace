@@ -148,11 +148,31 @@ class SupabaseDB:
         )
         return self._safe_data(result)
 
+    def get_tracked_person_twitter_cursor(self, tracked_person_id: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("tracked_person_twitter_cursors")
+            .select("*")
+            .eq("tracked_person_id", tracked_person_id)
+            .maybe_single()
+            .execute()
+        )
+        return self._safe_data(result)
+
     def count_twitter_snapshots(self, vc_id: str) -> int:
         data = (
             self.client.table("twitter_following_snapshots")
             .select("id", count="exact")
             .eq("vc_id", vc_id)
+            .limit(1)
+            .execute()
+        )
+        return data.count or 0
+
+    def count_tracked_person_twitter_snapshots(self, tracked_person_id: str) -> int:
+        data = (
+            self.client.table("tracked_person_twitter_following_snapshots")
+            .select("id", count="exact")
+            .eq("tracked_person_id", tracked_person_id)
             .limit(1)
             .execute()
         )
@@ -167,10 +187,30 @@ class SupabaseDB:
         )
         return data.count or 0
 
+    def count_all_tracked_person_twitter_snapshots(self) -> int:
+        data = (
+            self.client.table("tracked_person_twitter_following_snapshots")
+            .select("id", count="exact")
+            .limit(1)
+            .execute()
+        )
+        return data.count or 0
+
     def list_twitter_snapshots(self) -> list[dict[str, Any]]:
         return (
             self.client.table("twitter_following_snapshots")
             .select("id,vc_id,followed_handle,first_seen_at,created_at")
+            .order("first_seen_at", desc=True)
+            .order("created_at", desc=True)
+            .execute()
+            .data
+            or []
+        )
+
+    def list_tracked_person_twitter_snapshots(self) -> list[dict[str, Any]]:
+        return (
+            self.client.table("tracked_person_twitter_following_snapshots")
+            .select("id,tracked_person_id,followed_handle,first_seen_at,created_at")
             .order("first_seen_at", desc=True)
             .order("created_at", desc=True)
             .execute()
@@ -191,6 +231,19 @@ class SupabaseDB:
         )
         return len(row) > 0
 
+    def tracked_person_twitter_snapshot_exists(self, tracked_person_id: str, followed_handle: str) -> bool:
+        row = (
+            self.client.table("tracked_person_twitter_following_snapshots")
+            .select("id")
+            .eq("tracked_person_id", tracked_person_id)
+            .eq("followed_handle", normalize_handle(followed_handle))
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        return len(row) > 0
+
     def upsert_twitter_snapshot(self, vc_id: str, followed_handle: str, first_seen_at: date) -> None:
         self.client.table("twitter_following_snapshots").upsert(
             {
@@ -199,6 +252,21 @@ class SupabaseDB:
                 "first_seen_at": first_seen_at.isoformat(),
             },
             on_conflict="vc_id,followed_handle",
+        ).execute()
+
+    def upsert_tracked_person_twitter_snapshot(
+        self,
+        tracked_person_id: str,
+        followed_handle: str,
+        first_seen_at: date,
+    ) -> None:
+        self.client.table("tracked_person_twitter_following_snapshots").upsert(
+            {
+                "tracked_person_id": tracked_person_id,
+                "followed_handle": normalize_handle(followed_handle),
+                "first_seen_at": first_seen_at.isoformat(),
+            },
+            on_conflict="tracked_person_id,followed_handle",
         ).execute()
 
     def prune_twitter_snapshots(self, *, max_rows: int, protected_handles: set[str] | None = None) -> int:
@@ -233,6 +301,43 @@ class SupabaseDB:
         self.client.table("twitter_following_snapshots").delete().in_("id", ids_to_delete).execute()
         return len(ids_to_delete)
 
+    def prune_tracked_person_twitter_snapshots(
+        self,
+        *,
+        max_rows: int,
+        protected_handles: set[str] | None = None,
+    ) -> int:
+        if max_rows <= 0:
+            return 0
+
+        rows = (
+            self.client.table("tracked_person_twitter_following_snapshots")
+            .select("id,followed_handle,first_seen_at,created_at")
+            .order("first_seen_at")
+            .order("created_at")
+            .execute()
+            .data
+            or []
+        )
+        overflow = len(rows) - max_rows
+        if overflow <= 0:
+            return 0
+
+        protected = {normalize_handle(handle) for handle in (protected_handles or set()) if normalize_handle(handle)}
+        unprotected_rows = [
+            row for row in rows if normalize_handle(row.get("followed_handle")) not in protected
+        ]
+        protected_rows = [
+            row for row in rows if normalize_handle(row.get("followed_handle")) in protected
+        ]
+        delete_candidates = unprotected_rows + protected_rows
+        ids_to_delete = [row["id"] for row in delete_candidates[:overflow] if row.get("id")]
+        if not ids_to_delete:
+            return 0
+
+        self.client.table("tracked_person_twitter_following_snapshots").delete().in_("id", ids_to_delete).execute()
+        return len(ids_to_delete)
+
     def upsert_twitter_cursor(self, vc_id: str, last_known_handle: str, last_run_at: datetime | None = None) -> None:
         self.client.table("twitter_vc_cursors").upsert(
             {
@@ -241,6 +346,21 @@ class SupabaseDB:
                 "last_run_at": (last_run_at or utc_now()).isoformat(),
             },
             on_conflict="vc_id",
+        ).execute()
+
+    def upsert_tracked_person_twitter_cursor(
+        self,
+        tracked_person_id: str,
+        last_known_handle: str,
+        last_run_at: datetime | None = None,
+    ) -> None:
+        self.client.table("tracked_person_twitter_cursors").upsert(
+            {
+                "tracked_person_id": tracked_person_id,
+                "last_known_handle": normalize_handle(last_known_handle),
+                "last_run_at": (last_run_at or utc_now()).isoformat(),
+            },
+            on_conflict="tracked_person_id",
         ).execute()
 
     def upsert_twitter_vc_follow(
@@ -294,6 +414,13 @@ class SupabaseDB:
             person
             for person in self.list_tracked_git_people(active_only=True)
             if person.get("github_username")
+        ]
+
+    def list_tracked_git_people_with_twitter(self) -> list[dict[str, Any]]:
+        return [
+            person
+            for person in self.list_tracked_git_people(active_only=True)
+            if person.get("twitter_handle")
         ]
 
     def list_github_observed_people(self) -> list[dict[str, Any]]:
