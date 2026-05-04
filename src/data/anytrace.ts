@@ -3,10 +3,13 @@ export type ActivityPlatform = IdentityPlatform | "system";
 export type EventType =
   | "vc_follow"
   | "repo_traction"
+  | "viral_repo"
+  | "star_milestone"
   | "big_tech_exit"
   | "launch"
   | "mention"
-  | "important_github_follower";
+  | "important_github_follower"
+  | "linkedin_interaction";
 export type VcTier = "angel" | "microvc" | "vc";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
 export type WeeklyReasonKind =
@@ -91,6 +94,35 @@ export interface TrackedPerson {
   isWatchlist: boolean;
 }
 
+export interface GithubRepoSnapshot {
+  id: string;
+  personId: string;
+  repoOwner: string;
+  repoName: string;
+  stars: number;
+  forks: number;
+  watchers: number;
+  openIssues: number;
+  starDelta7d: number;
+  starDelta30d: number;
+  snapshotDate: string;
+}
+
+export interface GithubSignalProfile {
+  personId: string;
+  primaryRepoLabel: string;
+  stars: number;
+  forks: number;
+  watchers: number;
+  openIssues: number;
+  starDelta7d: number;
+  starDelta30d: number;
+  snapshotDate: string | null;
+  weeklyEventCount: number;
+  recentGithubEvents: number;
+  githubAttentionScore: number;
+}
+
 export interface PersonIdentity {
   id: string;
   personId: string;
@@ -136,6 +168,7 @@ export interface WeeklyPick {
   bigTechExit: boolean;
   person: TrackedPerson;
   reasons: WeeklyPickReason[];
+  githubProfile?: GithubSignalProfile | null;
 }
 
 export interface WatchlistPerson extends TrackedPerson {
@@ -145,6 +178,7 @@ export interface WatchlistPerson extends TrackedPerson {
   githubMomentum: number;
   bigTechExit: boolean;
   importantGithubFollowers: number;
+  githubProfile?: GithubSignalProfile | null;
 }
 
 export interface GraphNode {
@@ -160,11 +194,36 @@ export interface GraphEdge {
   eventCount: number;
   isTopPick: boolean;
   graphSource: "snapshot" | "event";
+  firstObservedAt?: string | null;
+  isRecent?: boolean;
+  followerCount?: number;
 }
 
 export interface WatchlistData {
   selectedVcs: UserVcWatchlistItem[];
   people: WatchlistPerson[];
+}
+
+export interface ObservedGithubPerson {
+  id: string;
+  sourceTrackedPersonId: string | null;
+  relationshipType: "follower" | "following";
+  githubUsername: string;
+  name: string;
+  profileUrl: string;
+  avatarUrl?: string | null;
+  bio: string;
+  company: string;
+  location: string;
+  blogUrl?: string | null;
+  twitterHandle?: string | null;
+  followersCount: number;
+  followingCount: number;
+  publicReposCount: number;
+  indicatorCount: number;
+  indicators: Array<{ kind: string; value: string | number }>;
+  canAddToWatchlist: boolean;
+  addedToWatchlist: boolean;
 }
 
 export interface GraphData {

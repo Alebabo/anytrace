@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -15,6 +15,7 @@ UTC = timezone.utc
 @dataclass(slots=True)
 class ScoreEngine:
     db: SupabaseDB
+    diff_engine: DiffEngine = field(init=False)
 
     def __post_init__(self) -> None:
         self.diff_engine = DiffEngine(self.db)

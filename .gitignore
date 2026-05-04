@@ -26,3 +26,4 @@ __pycache__/
 *.sln
 *.sw?
 .vercel
+backend/local_data/

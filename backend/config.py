@@ -15,10 +15,19 @@ def _env(name: str, default: str | None = None, *, required: bool = False) -> st
 class Settings:
     supabase_url: str
     supabase_key: str
+    twitter_provider: str
+    twitter_state_backend: str
+    twitter_local_db_path: str
     twitter_username: str
     twitter_password: str
     twitter_verification: str
     twitter_max_scrolls: int
+    twitter_snapshot_max_rows: int
+    tweetapi_key: str
+    tweetapi_base_url: str
+    tweetapi_page_size: int
+    tweetapi_max_pages: int
+    twitter_request_timeout_seconds: int
     github_token: str
     li_username: str
     li_password: str
@@ -31,6 +40,15 @@ class Settings:
     frontend_base_url: str
     log_level: str
     github_repo_limit: int
+    github_network_page_size: int
+    github_network_max_pages: int
+    github_min_star_delta_7d_for_event: int
+    github_min_total_stars_for_event: int
+    github_min_indicator_count_for_event: int
+    github_viral_repo_limit: int
+    github_viral_min_stars: int
+    github_viral_min_star_delta_7d: int
+    github_viral_pushed_within_days: int
     linkedin_min_delay_seconds: int
     linkedin_max_delay_seconds: int
 
@@ -75,10 +93,19 @@ def get_settings() -> Settings:
     return Settings(
         supabase_url=_env("SUPABASE_URL", ""),
         supabase_key=_env("SUPABASE_KEY", ""),
+        twitter_provider=_env("TWITTER_PROVIDER", "auto").strip().lower(),
+        twitter_state_backend=_env("TWITTER_STATE_BACKEND", "supabase").strip().lower(),
+        twitter_local_db_path=_env("TWITTER_LOCAL_DB_PATH", "backend/local_data/twitter_state.db").strip(),
         twitter_username=_env("TWITTER_USERNAME", ""),
         twitter_password=_env("TWITTER_PASSWORD", ""),
         twitter_verification=_env("TWITTER_VERIFICATION", ""),
         twitter_max_scrolls=int(_env("TWITTER_MAX_SCROLLS", "60")),
+        twitter_snapshot_max_rows=int(_env("TWITTER_SNAPSHOT_MAX_ROWS", "100")),
+        tweetapi_key=_env("TWEETAPI_KEY", _env("TWITTERAPI_IO_KEY", "")),
+        tweetapi_base_url=_env("TWEETAPI_BASE_URL", "https://api.tweetapi.com/tw-v2").strip(),
+        tweetapi_page_size=int(_env("TWEETAPI_PAGE_SIZE", _env("TWITTERAPI_IO_PAGE_SIZE", "100"))),
+        tweetapi_max_pages=int(_env("TWEETAPI_MAX_PAGES", _env("TWITTERAPI_IO_MAX_PAGES", "3"))),
+        twitter_request_timeout_seconds=int(_env("TWITTER_REQUEST_TIMEOUT_SECONDS", "30")),
         github_token=_env("GITHUB_TOKEN", ""),
         li_username=_env("LI_USERNAME", ""),
         li_password=_env("LI_PASSWORD", ""),
@@ -91,6 +118,15 @@ def get_settings() -> Settings:
         frontend_base_url=_env("FRONTEND_BASE_URL", _env("VITE_SITE_URL", "http://localhost:8080")),
         log_level=_env("LOG_LEVEL", "INFO"),
         github_repo_limit=int(_env("GITHUB_REPO_LIMIT", "25")),
+        github_network_page_size=int(_env("GITHUB_NETWORK_PAGE_SIZE", "100")),
+        github_network_max_pages=int(_env("GITHUB_NETWORK_MAX_PAGES", "3")),
+        github_min_star_delta_7d_for_event=int(_env("GITHUB_MIN_STAR_DELTA_7D_FOR_EVENT", "40")),
+        github_min_total_stars_for_event=int(_env("GITHUB_MIN_TOTAL_STARS_FOR_EVENT", "100")),
+        github_min_indicator_count_for_event=int(_env("GITHUB_MIN_INDICATOR_COUNT_FOR_EVENT", "2")),
+        github_viral_repo_limit=int(_env("GITHUB_VIRAL_REPO_LIMIT", "20")),
+        github_viral_min_stars=int(_env("GITHUB_VIRAL_MIN_STARS", "150")),
+        github_viral_min_star_delta_7d=int(_env("GITHUB_VIRAL_MIN_STAR_DELTA_7D", "25")),
+        github_viral_pushed_within_days=int(_env("GITHUB_VIRAL_PUSHED_WITHIN_DAYS", "10")),
         linkedin_min_delay_seconds=int(_env("LINKEDIN_MIN_DELAY_SECONDS", "30")),
         linkedin_max_delay_seconds=int(_env("LINKEDIN_MAX_DELAY_SECONDS", "90")),
     )

@@ -1,5 +1,25 @@
 import type { PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 
+function getBackendBaseUrl() {
+  return import.meta.env.VITE_ANYTRACE_BACKEND_URL?.trim() || "http://127.0.0.1:8766";
+}
+
+function normalizeHandle(handle?: string | null) {
+  return handle?.replace(/^@/, "").trim() || null;
+}
+
+function lastPathSegment(url?: string | null) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    return parts.at(-1) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function parseLinkedinResource(linkedinUrl?: string | null) {
   if (!linkedinUrl) return null;
 
@@ -30,35 +50,84 @@ function unavatarLinkedin(linkedinUrl?: string | null, fallbackName?: string) {
 }
 
 function unavatarX(handle?: string | null, fallbackName?: string) {
-  if (!handle) return null;
+  const normalizedHandle = normalizeHandle(handle);
+  if (!normalizedHandle) return null;
   const fallback = fallbackName ? "?fallback=false" : "";
-  return `https://unavatar.io/x/${handle}${fallback}`;
+  return `https://unavatar.io/x/${normalizedHandle}${fallback}`;
+}
+
+function unavatarTwitter(handle?: string | null, fallbackName?: string) {
+  const normalizedHandle = normalizeHandle(handle);
+  if (!normalizedHandle) return null;
+  const fallback = fallbackName ? "?fallback=false" : "";
+  return `https://unavatar.io/twitter/${normalizedHandle}${fallback}`;
 }
 
 function githubAvatar(username?: string | null, size = 160) {
-  if (!username) return null;
-  return `https://github.com/${username}.png?size=${size}`;
+  const normalizedUsername = normalizeHandle(username);
+  if (!normalizedUsername) return null;
+  return `https://github.com/${normalizedUsername}.png?size=${size}`;
 }
 
-export function avatarSourcesForPerson(person: TrackedPerson, identities: PersonIdentity[]) {
-  const github = identities.find((identity) => identity.platform === "github")?.handle;
-  const x = identities.find((identity) => identity.platform === "x")?.handle;
-  const linkedin = identities.find((identity) => identity.platform === "linkedin")?.profileUrl;
+function avatarProxyUrl(platform: "x" | "linkedin" | "github", value?: string | null) {
+  if (!value) return null;
 
-  return [
+  const endpoint = new URL("/avatar-proxy", getBackendBaseUrl());
+  endpoint.searchParams.set("platform", platform);
+  if (platform === "linkedin") {
+    endpoint.searchParams.set("profile_url", value);
+  } else {
+    endpoint.searchParams.set("handle", value);
+  }
+  return endpoint.toString();
+}
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return [...new Set(values.filter((value): value is string => !!value))];
+}
+
+function definedIdentities(identities: Array<PersonIdentity | null | undefined>) {
+  return identities.filter((identity): identity is PersonIdentity => Boolean(identity));
+}
+
+export function avatarSourcesForPerson(
+  person: TrackedPerson | null | undefined,
+  identities: Array<PersonIdentity | null | undefined>,
+) {
+  if (!person) return [];
+
+  const safeIdentities = definedIdentities(identities);
+  const githubIdentity = safeIdentities.find((identity) => identity.platform === "github");
+  const xIdentity = safeIdentities.find((identity) => identity.platform === "x");
+  const linkedinIdentity = safeIdentities.find((identity) => identity.platform === "linkedin");
+
+  const github = githubIdentity?.handle || lastPathSegment(githubIdentity?.profileUrl);
+  const x = xIdentity?.handle || lastPathSegment(xIdentity?.profileUrl);
+  const linkedin = linkedinIdentity?.profileUrl ?? null;
+
+  return uniqueStrings([
     person.avatarUrl ?? null,
+    avatarProxyUrl("github", github),
+    avatarProxyUrl("x", x),
+    avatarProxyUrl("linkedin", linkedin),
+    unavatarLinkedin(linkedin, person.fullName),
     githubAvatar(github),
     unavatarX(x, person.fullName),
-    unavatarLinkedin(linkedin, person.fullName),
-  ].filter((value): value is string => !!value);
+    unavatarTwitter(x, person.fullName),
+  ]);
 }
 
 export function avatarSourcesForVc(vc: VcSource) {
-  const xHandle = vc.xHandle ?? vc.twitterUrl?.split("/").filter(Boolean).at(-1) ?? null;
+  const xHandle = normalizeHandle(vc.xHandle) ?? lastPathSegment(vc.twitterUrl);
 
-  return [
+  return uniqueStrings([
+    avatarProxyUrl("x", xHandle),
+    avatarProxyUrl("linkedin", vc.linkedinUrl),
+    avatarProxyUrl("github", vc.githubUsername),
     unavatarLinkedin(vc.linkedinUrl, vc.name),
-    vc.githubUsername ? githubAvatar(vc.githubUsername) : null,
     unavatarX(xHandle, vc.name),
-  ].filter((value): value is string => !!value);
+    unavatarTwitter(xHandle, vc.name),
+    githubAvatar(vc.githubUsername),
+    vc.websiteUrl ? `https://unavatar.io/${vc.websiteUrl}` : null,
+  ]);
 }

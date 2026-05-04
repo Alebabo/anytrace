@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
 from backend.db import SupabaseDB
@@ -12,6 +12,7 @@ UTC = timezone.utc
 @dataclass(slots=True)
 class NewsEngine:
     db: SupabaseDB
+    diff_engine: DiffEngine = field(init=False)
 
     def __post_init__(self) -> None:
         self.diff_engine = DiffEngine(self.db)

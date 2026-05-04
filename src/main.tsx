@@ -1,5 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { initializeSupabaseAuth } from "@/lib/supabaseAuth";
 
-createRoot(document.getElementById("root")!).render(<App />);
+void initializeSupabaseAuth().finally(() => {
+  createRoot(document.getElementById("root")!).render(<App />);
+});

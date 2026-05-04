@@ -1,6 +1,7 @@
 import { ArrowUpRight, Github, Linkedin, Sparkles, Twitter } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ActivityLine } from "@/components/anytrace/ActivityLine";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
 import { Button } from "@/components/ui/button";
@@ -11,45 +12,6 @@ import { avatarSourcesForPerson } from "@/lib/avatarSources";
 
 function pickIdentity(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
-}
-
-function formatEvidenceLine(event: ActivityEvent, personName: string, vcsById: Map<string, VcSource>) {
-  const vcName = event.vcSourceId ? vcsById.get(event.vcSourceId)?.name : null;
-
-  if (event.eventType === "vc_follow" && vcName) {
-    return `${vcName} followed ${personName} on X.`;
-  }
-
-  if (event.eventType === "repo_traction") {
-    const stars = Number(event.metadata.weekly_star_delta ?? 0);
-    return stars > 0
-      ? `${personName} gained ${stars} GitHub stars this week.`
-      : `${personName} showed fresh GitHub repo traction.`;
-  }
-
-  if (event.eventType === "big_tech_exit") {
-    const company = typeof event.metadata.company === "string" ? event.metadata.company : null;
-    return company
-      ? `${personName} left ${company} to build.`
-      : `${personName} made a notable operating move this week.`;
-  }
-
-  if (event.eventType === "important_github_follower") {
-    const followerCount = Number(event.metadata.follower_count ?? 0);
-    return followerCount > 0
-      ? `${personName} picked up ${followerCount} high-signal GitHub followers.`
-      : `${personName} picked up high-signal GitHub followers.`;
-  }
-
-  if (event.eventType === "launch") {
-    return `${personName} posted a fresh launch signal.`;
-  }
-
-  if (event.eventType === "mention") {
-    return `${personName} was mentioned in a tracked signal.`;
-  }
-
-  return event.headline;
 }
 
 function PickCard({
@@ -129,15 +91,13 @@ function PickCard({
               <div className="mt-3 space-y-2">
                 {evidence.length > 0 ? (
                   evidence.map((event) => (
-                    <div key={event.id} className="flex items-start gap-3 text-sm">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/70" />
-                      <div className="min-w-0">
-                        <div>{formatEvidenceLine(event, pick.person.fullName, vcsById)}</div>
-                        <div className="mt-0.5 text-[11px] text-muted-foreground">
-                          {new Date(event.occurredAt).toLocaleDateString("de-DE")}
-                        </div>
-                      </div>
-                    </div>
+                    <ActivityLine
+                      key={event.id}
+                      event={event}
+                      personName={pick.person.fullName}
+                      vcsById={vcsById}
+                      className="border-b border-border/40 pb-2 last:border-b-0 last:pb-0"
+                    />
                   ))
                 ) : (
                   <div className="text-sm text-muted-foreground">No evidence events are stored for this person yet.</div>
@@ -148,7 +108,7 @@ function PickCard({
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{pick.vcFollowCount} VC follows</span>
+              <span>{pick.vcFollowCount} new VC follows</span>
               <span>/</span>
               <span>{pick.githubAttentionScore} GitHub delta</span>
               <span>/</span>
@@ -239,7 +199,7 @@ export default function MainDashboard() {
         <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:flex-wrap md:items-end md:justify-between">
           <div>
             <h2 className="font-serif text-4xl leading-[1.02] text-balance md:text-5xl">
-              Main <span className="text-muted-foreground">workspace</span>
+              Main <span className="text-muted-foreground">overview</span>
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Das Ranking ist noch nicht neu verdrahtet, aber die VC-Datenbasis kommt jetzt direkt aus Supabase.

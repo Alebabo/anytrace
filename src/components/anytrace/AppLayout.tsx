@@ -5,21 +5,15 @@ import {
   Settings,
   Menu,
   Network,
+  Activity,
   Users,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import anytraceLogo from "@/assets/anytrace-logo.png";
 import { AccessBadge } from "@/components/anytrace/AccessBadge";
-import { useAccessState } from "@/hooks/useAnytrace";
 
 type NavItem = {
   to: string;
@@ -30,13 +24,13 @@ type NavItem = {
 const nav: NavItem[] = [
   { to: "/", label: "Main", icon: LayoutDashboard },
   { to: "/graph", label: "Graph", icon: Network },
+  { to: "/activities", label: "Activities", icon: Activity },
   { to: "/watchlist", label: "Watchlist", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AppLayout() {
   const { pathname } = useLocation();
-  const { session } = useAccessState();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const active = nav.find((item) => (item.to === "/" ? pathname === "/" : pathname.startsWith(item.to)));
@@ -81,40 +75,68 @@ export default function AppLayout() {
     <div className="flex min-h-screen w-full bg-background text-foreground">
       <aside
         className={`sticky top-0 hidden h-screen shrink-0 overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex ${
-          sidebarCollapsed ? "w-16" : "w-60"
+          sidebarCollapsed ? "w-[84px]" : "w-72"
         }`}
       >
-        <div className="relative flex h-20 items-center justify-center px-2">
-          <Link to="/" className="flex items-center justify-center" aria-label="Anytrace">
-            <img
-              src={anytraceLogo}
-              alt="Anytrace"
-              className={`${sidebarCollapsed ? "h-8" : "h-16"} w-auto object-contain [filter:invert(1)_brightness(0.15)] transition-all`}
-            />
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarCollapsed((value) => !value)}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="absolute right-2 top-2 h-7 w-7"
-          >
-            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
-        </div>
-
-        <NavList collapsed={sidebarCollapsed} />
-
-        {!sidebarCollapsed && (
-          <div className="p-4">
-            <div className="rounded-2xl border border-sidebar-border bg-background/60 px-3 py-3">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Anytrace</p>
-              <p className="mt-2 text-xs leading-relaxed text-sidebar-foreground">
-                Live VC data from Supabase plus manual backend triggers for the X scraper.
-              </p>
+        <div className="flex h-full w-full flex-col">
+          <div className={`border-b border-sidebar-border ${sidebarCollapsed ? "px-3 py-4" : "px-5 py-5"}`}>
+            <div className={`flex items-start ${sidebarCollapsed ? "justify-center" : "justify-between"} gap-3`}>
+              <Link
+                to="/"
+                className={`min-w-0 ${sidebarCollapsed ? "flex items-center justify-center" : "flex flex-1 items-center"}`}
+                aria-label="Anytrace"
+              >
+                <img
+                  src={anytraceLogo}
+                  alt="Anytrace"
+                  className={`${sidebarCollapsed ? "h-10" : "h-14"} w-auto shrink-0 object-contain [filter:invert(1)_brightness(0.15)]`}
+                />
+              </Link>
+              {!sidebarCollapsed && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarCollapsed((value) => !value)}
+                  aria-label="Collapse sidebar"
+                  className="h-9 w-9 shrink-0 rounded-full border border-sidebar-border bg-background/70"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+
+            {sidebarCollapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarCollapsed((value) => !value)}
+                aria-label="Expand sidebar"
+                className="mt-3 h-9 w-9 rounded-full border border-sidebar-border bg-background/70"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        )}
+
+          <div className={`flex-1 overflow-y-auto ${sidebarCollapsed ? "px-2 py-4" : "px-4 py-5"}`}>
+            <NavList collapsed={sidebarCollapsed} />
+          </div>
+
+          <div className={`${sidebarCollapsed ? "px-2 pb-4" : "px-4 pb-5"}`}>
+            {!sidebarCollapsed ? (
+              <div className="rounded-2xl border border-sidebar-border bg-background/70 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-sidebar-foreground/60">Status</div>
+                <div className="mt-2 text-sm text-sidebar-foreground">TweetAPI live, graph synced, scans ready.</div>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl border border-sidebar-border bg-background/70 text-[10px] font-semibold tracking-[0.22em] text-sidebar-foreground/70">
+                  AT
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -130,7 +152,7 @@ export default function AppLayout() {
                 <img
                   src={anytraceLogo}
                   alt="Anytrace"
-                  className="h-14 w-auto object-contain [filter:invert(1)_brightness(0.15)]"
+                  className="h-12 w-auto object-contain [filter:invert(1)_brightness(0.15)]"
                 />
               </Link>
               <NavList onItemClick={() => setMobileNavOpen(false)} />
@@ -143,23 +165,9 @@ export default function AppLayout() {
           <div className="hidden sm:block">
             <AccessBadge />
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Account"
-                className="ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-foreground text-xs font-medium text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {session?.user.email?.slice(0, 2).toUpperCase() ?? "AT"}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">{session?.user.email ?? "local@anytrace.app"}</span>
-                <span className="text-[11px] font-normal text-muted-foreground">Local workspace</span>
-              </DropdownMenuLabel>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-foreground text-xs font-medium text-background">
+            AT
+          </div>
         </header>
         <main className="min-w-0 flex-1">
           <div className="border-b border-border bg-background px-3 py-2 sm:hidden">

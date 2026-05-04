@@ -9,12 +9,22 @@ import AppLayout from "@/components/anytrace/AppLayout";
 
 const MainDashboard = lazy(() => import("@/pages/Index"));
 const GraphPage = lazy(() => import("@/pages/Explore"));
+const ActivitiesPage = lazy(() => import("@/pages/Activities"));
 const WatchlistPage = lazy(() => import("@/pages/Watchlist"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const ConnectionDetail = lazy(() => import("@/pages/Connections"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const AppFallback = () => (
   <div className="min-h-screen bg-background px-4 py-8 md:px-8">
@@ -37,6 +47,7 @@ const App = () => (
             <Route element={<AppLayout />}>
               <Route path="/" element={<MainDashboard />} />
               <Route path="/graph" element={<GraphPage />} />
+              <Route path="/activities" element={<ActivitiesPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/connections/:id" element={<ConnectionDetail />} />

@@ -125,6 +125,27 @@
     width: 1px;
     background: hsl(var(--border));
   }
+
+  .anytrace-graph-flow .react-flow__background {
+    z-index: 0;
+  }
+
+  .anytrace-graph-flow .react-flow__edges {
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .anytrace-graph-flow .react-flow__edge {
+    pointer-events: none;
+  }
+
+  .anytrace-graph-flow .react-flow__nodes {
+    z-index: 2;
+  }
+
+  .anytrace-graph-flow .react-flow__node {
+    z-index: 2 !important;
+  }
 }
 
 @layer utilities {
