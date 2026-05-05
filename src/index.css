@@ -109,6 +109,14 @@
   .text-balance { text-wrap: balance; }
   .text-pretty { text-wrap: pretty; }
 
+  .hero-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.45) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.45) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(circle at center, black 38%, transparent 88%);
+  }
+
   .bg-grid {
     background-image:
       linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
@@ -149,7 +157,26 @@
 }
 
 @layer utilities {
+  .float-slow {
+    animation: anytrace-float 11s ease-in-out infinite;
+  }
+
+  .float-slower {
+    animation: anytrace-float 14s ease-in-out infinite;
+    animation-delay: -4s;
+  }
+
   .ring-focus {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+@keyframes anytrace-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -12px, 0);
   }
 }

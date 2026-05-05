@@ -75,8 +75,8 @@ def run_alerts() -> None:
 
 
 def run_pipeline() -> None:
-    run_twitter()
     run_github()
+    run_twitter()
     run_scores()
     run_linkedin()
     run_news()

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" rx="38" fill="#f8f6f1"/>
+  <rect x="36" y="36" width="1208" height="728" rx="32" fill="#ffffff" stroke="#e1ddd3"/>
+  <text x="92" y="120" fill="#14312f" font-size="50" font-family="Arial, sans-serif" font-weight="700">Connection graph</text>
+  <text x="92" y="162" fill="#45625d" font-size="24" font-family="Arial, sans-serif">Static first-degree graph with selected node centered.</text>
+  <rect x="126" y="210" width="1028" height="500" rx="30" fill="#f5f4ee" stroke="#e1ddd3"/>
+  <line x1="640" y1="460" x2="640" y2="292" stroke="#cbc3b2" stroke-width="3"/>
+  <line x1="640" y1="460" x2="792" y2="346" stroke="#cbc3b2" stroke-width="3"/>
+  <line x1="640" y1="460" x2="792" y2="574" stroke="#cbc3b2" stroke-width="3"/>
+  <line x1="640" y1="460" x2="640" y2="628" stroke="#cbc3b2" stroke-width="3"/>
+  <line x1="640" y1="460" x2="488" y2="574" stroke="#cbc3b2" stroke-width="3"/>
+  <line x1="640" y1="460" x2="488" y2="346" stroke="#cbc3b2" stroke-width="3"/>
+  <rect x="590" y="410" width="100" height="100" rx="28" fill="#ffffff" stroke="#d8d2c6"/>
+  <text x="640" y="468" fill="#14312f" font-size="28" font-family="Arial, sans-serif" font-weight="700" text-anchor="middle">NH</text>
+  <rect x="610" y="256" width="60" height="60" rx="18" fill="#ffffff" stroke="#d8d2c6"/>
+  <rect x="762" y="316" width="60" height="60" rx="18" fill="#ffffff" stroke="#d8d2c6"/>
+  <rect x="762" y="544" width="60" height="60" rx="18" fill="#ffffff" stroke="#d8d2c6"/>
+  <rect x="610" y="604" width="60" height="60" rx="18" fill="#ffffff" stroke="#d8d2c6"/>
+  <rect x="458" y="544" width="60" height="60" rx="18" fill="#ffffff" stroke="#d8d2c6"/>
+  <rect x="458" y="316" width="60" height="60" rx="18" fill="#ffffff" stroke="#d8d2c6"/>
+  <text x="640" y="542" fill="#14312f" font-size="26" font-family="Arial, sans-serif" font-weight="700" text-anchor="middle">Nina Hartmann</text>
+</svg>

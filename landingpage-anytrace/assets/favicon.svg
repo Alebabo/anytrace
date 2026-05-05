@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#111111"/>
+  <!-- edges -->
+  <line x1="32" y1="18" x2="20" y2="30" stroke="white" stroke-width="1.4" stroke-opacity="0.5"/>
+  <line x1="32" y1="18" x2="44" y2="28" stroke="white" stroke-width="1.4" stroke-opacity="0.5"/>
+  <line x1="20" y1="30" x2="28" y2="44" stroke="white" stroke-width="1.4" stroke-opacity="0.5"/>
+  <line x1="44" y1="28" x2="38" y2="44" stroke="white" stroke-width="1.4" stroke-opacity="0.5"/>
+  <line x1="20" y1="30" x2="44" y2="28" stroke="white" stroke-width="1.4" stroke-opacity="0.35"/>
+  <line x1="28" y1="44" x2="38" y2="44" stroke="white" stroke-width="1.4" stroke-opacity="0.35"/>
+  <line x1="12" y1="22" x2="20" y2="30" stroke="white" stroke-width="1.2" stroke-opacity="0.3"/>
+  <line x1="44" y1="28" x2="52" y2="20" stroke="white" stroke-width="1.2" stroke-opacity="0.3"/>
+  <!-- large nodes -->
+  <circle cx="20" cy="30" r="5.5" fill="white"/>
+  <circle cx="44" cy="28" r="5.5" fill="white"/>
+  <!-- medium nodes -->
+  <circle cx="32" cy="18" r="4" fill="white"/>
+  <circle cx="28" cy="44" r="3.5" fill="white"/>
+  <circle cx="38" cy="44" r="3.5" fill="white"/>
+  <!-- small satellite nodes -->
+  <circle cx="12" cy="22" r="2.5" fill="white" opacity="0.7"/>
+  <circle cx="52" cy="20" r="2.5" fill="white" opacity="0.7"/>
+  <circle cx="22" cy="50" r="2" fill="white" opacity="0.5"/>
+</svg>

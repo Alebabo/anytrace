@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" rx="38" fill="#f8f6f1"/>
+  <rect x="36" y="36" width="1208" height="728" rx="32" fill="#ffffff" stroke="#e1ddd3"/>
+  <text x="92" y="120" fill="#14312f" font-size="50" font-family="Arial, sans-serif" font-weight="700">Evidence timeline</text>
+  <text x="92" y="162" fill="#45625d" font-size="24" font-family="Arial, sans-serif">Every score stays connected to visible events.</text>
+  <line x1="214" y1="242" x2="214" y2="650" stroke="#cbc3b2" stroke-width="4"/>
+  <circle cx="214" cy="286" r="10" fill="#14312f"/>
+  <circle cx="214" cy="414" r="10" fill="#14312f"/>
+  <circle cx="214" cy="542" r="10" fill="#14312f"/>
+  <rect x="258" y="244" width="850" height="88" rx="22" fill="#faf9f6" stroke="#e1ddd3"/>
+  <rect x="258" y="372" width="850" height="88" rx="22" fill="#faf9f6" stroke="#e1ddd3"/>
+  <rect x="258" y="500" width="850" height="88" rx="22" fill="#faf9f6" stroke="#e1ddd3"/>
+  <text x="290" y="282" fill="#45625d" font-size="18" font-family="Arial, sans-serif">2h ago</text>
+  <text x="290" y="314" fill="#14312f" font-size="28" font-family="Arial, sans-serif" font-weight="700">Two VC-linked follows appeared on X</text>
+  <text x="290" y="410" fill="#45625d" font-size="18" font-family="Arial, sans-serif">Yesterday</text>
+  <text x="290" y="442" fill="#14312f" font-size="28" font-family="Arial, sans-serif" font-weight="700">Primary repo gained 312 stars in 7 days</text>
+  <text x="290" y="538" fill="#45625d" font-size="18" font-family="Arial, sans-serif">3 days ago</text>
+  <text x="290" y="570" fill="#14312f" font-size="28" font-family="Arial, sans-serif" font-weight="700">LinkedIn interaction and hiring movement detected</text>
+</svg>

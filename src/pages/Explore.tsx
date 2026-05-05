@@ -33,6 +33,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAccessState, useGraphData, usePersonIdentities, useRefreshAnytraceData } from "@/hooks/useAnytrace";
 import type { ActivityPlatform, IdentityPlatform, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
+import { personDisplayLabel } from "@/lib/personLabels";
 
 type GraphNodeData =
   | { kind: "vc"; vc: VcSource; highlight: boolean; dim: boolean; imageUrls: string[] }
@@ -147,22 +148,8 @@ function platformColor(platform: ActivityPlatform) {
   return "hsl(var(--foreground))";
 }
 
-function isGenericTrackedRole(roleTitle?: string | null) {
-  const normalized = roleTitle?.trim().toLowerCase() || "";
-  return normalized === "tracked x account" || normalized === "tracked git person" || normalized === "tracked builder";
-}
-
 function personConnectionLabel(person: TrackedPerson) {
-  const parts = [
-    !isGenericTrackedRole(person.roleTitle) ? person.roleTitle?.trim() : "",
-    person.company?.trim() || "",
-  ].filter(Boolean);
-
-  if (parts.length > 0) return parts.join(" / ");
-  if (person.company?.trim()) return person.company.trim();
-  if (person.roleTitle?.trim()) return person.roleTitle.trim();
-  if (person.location?.trim()) return person.location.trim();
-  return "Profile";
+  return personDisplayLabel(person);
 }
 
 function EmptyGraphState({
@@ -385,6 +372,7 @@ function GraphInner() {
   const deferredQuery = useDeferredValue(query);
   const deferredOverviewQuery = useDeferredValue(overviewQuery);
   const focusVcId = searchParams.get("focusVc");
+  const focusPersonId = searchParams.get("focusPerson");
 
   const graph = graphQuery.data;
   const identities = useMemo(() => identitiesQuery.data ?? [], [identitiesQuery.data]);
@@ -679,6 +667,19 @@ function GraphInner() {
     nextParams.delete("focusVc");
     setSearchParams(nextParams, { replace: true });
   }, [built.nodes, focusNode, focusVcId, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!focusPersonId || built.nodes.length === 0) return;
+    const node = built.nodes.find((entry) => entry.id === focusPersonId && entry.data.kind === "person");
+    if (!node) return;
+
+    setSelectedNodeId(focusPersonId);
+    focusNode(focusPersonId);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("focusPerson");
+    setSearchParams(nextParams, { replace: true });
+  }, [built.nodes, focusNode, focusPersonId, searchParams, setSearchParams]);
 
   const overviewPeople = useMemo(() => {
     if (!graph) return [];
@@ -1111,10 +1112,7 @@ function GraphInner() {
                         />
                         <div className="min-w-0">
                           <div className="text-base font-medium">{selectedPerson.fullName}</div>
-                          <div className="mt-1 text-sm text-muted-foreground">
-                            {selectedPerson.roleTitle}
-                            {selectedPerson.company ? ` / ${selectedPerson.company}` : ""}
-                          </div>
+                          <div className="mt-1 text-sm text-muted-foreground">{personConnectionLabel(selectedPerson)}</div>
                         </div>
                       </div>
                       <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
@@ -1363,10 +1361,7 @@ function GraphInner() {
                     />
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{selectedPerson.fullName}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {selectedPerson.roleTitle}
-                        {selectedPerson.company ? ` / ${selectedPerson.company}` : ""}
-                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">{personConnectionLabel(selectedPerson)}</div>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedNodeId(null)}>

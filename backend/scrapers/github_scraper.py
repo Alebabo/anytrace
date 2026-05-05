@@ -272,6 +272,19 @@ class GithubScraper:
 
     def process_person(self, person: dict, tracked_by_github: dict[str, dict]) -> GithubRunResult:
         username = person["github_username"]
+        user = self._fetch_user(username)
+        refreshed_person = self.db.upsert_tracked_git_person(
+            name=(user.get("name") or person.get("name") or username).strip(),
+            github_username=username,
+            twitter_handle=user.get("twitter_username") or person.get("twitter_handle"),
+            linkedin_url=person.get("linkedin_url"),
+            role_title=person.get("role_title"),
+            company=user.get("company") or person.get("company"),
+            location=user.get("location") or person.get("location"),
+            summary=person.get("summary"),
+        )
+        tracked_by_github[username.strip().lower()] = refreshed_person
+        person = refreshed_person
         logger.info("Fetching GitHub repos for %s (%s)", person["name"], username)
         repos = self._fetch_repos(username)
         repos = sorted(repos, key=lambda repo: repo.get("stargazers_count", 0), reverse=True)

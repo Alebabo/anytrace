@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useAnytrace";
 import type { PersonIdentity, UserVcWatchlistItem, WatchlistPerson } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
+import { personDisplayLabel } from "@/lib/personLabels";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
@@ -128,11 +129,7 @@ function SelectedGithubRow({
         />
         <div className="min-w-0">
           <div className="truncate text-sm font-medium">{person.fullName}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">
-            {person.roleTitle}
-            {person.company ? ` / ${person.company}` : ""}
-            {person.location ? ` / ${person.location}` : ""}
-          </div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">{personDisplayLabel(person)}</div>
           <div className="mt-1 text-[11px] text-muted-foreground">
             {person.vcFollowersThisWeek} new VC follows / {person.githubMomentum} repo delta
           </div>
@@ -185,9 +182,7 @@ function FollowSuggestionCard({ suggestion }: { suggestion: FollowSuggestion }) 
         />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">{suggestion.person.fullName}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">
-            {suggestion.person.company || suggestion.person.roleTitle || "Tracked profile"}
-          </div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">{personDisplayLabel(suggestion.person)}</div>
         </div>
       </div>
 

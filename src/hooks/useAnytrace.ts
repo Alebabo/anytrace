@@ -504,7 +504,6 @@ export function useGithubSignalProfiles(_enabled = true) {
 
 export function useWatchlist(_enabled = true) {
   const vcsQuery = useVcSources(_enabled);
-  const graphQuery = useGraphData(_enabled);
   const trackedPeopleQuery = useTrackedPeople(_enabled);
   const identitiesQuery = usePersonIdentities(_enabled);
   const githubProfilesQuery = useGithubSignalProfiles(_enabled);
@@ -512,65 +511,34 @@ export function useWatchlist(_enabled = true) {
 
   return useMemo(
     () => {
-      const graphPeople = graphQuery.data?.people ?? [];
       const trackedPeople = trackedPeopleQuery.data ?? [];
-      const graphEvents = graphQuery.data?.events ?? [];
       const identities = identitiesQuery.data ?? [];
       const githubProfiles = githubProfilesQuery.data ?? [];
       const weeklyPicks = weeklyPicksQuery.data ?? [];
       const identitiesByPerson = new Map<string, PersonIdentity[]>();
       const weeklyPickByPerson = new Map(weeklyPicks.map((pick) => [pick.person.id, pick]));
       const githubProfileByPerson = new Map(githubProfiles.map((profile) => [profile.personId, profile]));
-      const githubEventsByPerson = new Map<string, ActivityEvent[]>();
 
       for (const identity of identities) {
         const list = identitiesByPerson.get(identity.personId) ?? [];
         list.push(identity);
         identitiesByPerson.set(identity.personId, list);
       }
-
-      for (const event of graphEvents) {
-        if (event.platform !== "github") continue;
-        const list = githubEventsByPerson.get(event.personId) ?? [];
-        list.push(event);
-        githubEventsByPerson.set(event.personId, list);
-      }
-
-      const peopleById = new Map<string, TrackedPerson>();
-
-      for (const person of trackedPeople) {
-        peopleById.set(person.id, person);
-      }
-
-      for (const person of graphPeople) {
-        peopleById.set(person.id, {
-          ...(peopleById.get(person.id) ?? person),
-          ...person,
-        });
-      }
-
-      const selectedPeople = [...peopleById.values()]
-        .filter((person) => {
-          return person.isWatchlist || person.id.startsWith("viral-github-");
-        })
+      const selectedPeople = trackedPeople
+        .filter((person) => person.isWatchlist)
         .map((person) => {
           const personIdentities = identitiesByPerson.get(person.id) ?? [];
           const weeklyPick = weeklyPickByPerson.get(person.id) ?? null;
           const githubProfile = githubProfileByPerson.get(person.id) ?? null;
-          const personEvents = githubEventsByPerson.get(person.id) ?? [];
-          const derivedGithubMomentum = personEvents.reduce((maxValue, event) => {
-            const weeklyDelta = Number(event.metadata.weekly_star_delta ?? 0);
-            return Math.max(maxValue, weeklyDelta);
-          }, 0);
 
           return {
             ...person,
             identities: personIdentities,
-            signalsThisWeek: weeklyPick?.score ?? personEvents.length,
+            signalsThisWeek: weeklyPick?.score ?? 0,
             vcFollowersThisWeek: weeklyPick?.vcFollowCount ?? 0,
-            githubMomentum: githubProfile?.starDelta7d ?? derivedGithubMomentum,
+            githubMomentum: githubProfile?.starDelta7d ?? 0,
             bigTechExit: weeklyPick?.bigTechExit ?? false,
-            importantGithubFollowers: githubProfile?.recentGithubEvents ?? personEvents.length,
+            importantGithubFollowers: githubProfile?.recentGithubEvents ?? 0,
             githubProfile,
           } satisfies WatchlistPerson;
         })
@@ -590,28 +558,25 @@ export function useWatchlist(_enabled = true) {
         } as WatchlistData,
         isLoading:
           vcsQuery.isLoading ||
-          graphQuery.isLoading ||
           trackedPeopleQuery.isLoading ||
           identitiesQuery.isLoading ||
           githubProfilesQuery.isLoading ||
           weeklyPicksQuery.isLoading,
         isError:
           vcsQuery.isError ||
-          graphQuery.isError ||
           trackedPeopleQuery.isError ||
           identitiesQuery.isError ||
           githubProfilesQuery.isError ||
           weeklyPicksQuery.isError,
         error:
           vcsQuery.error ||
-          graphQuery.error ||
           trackedPeopleQuery.error ||
           identitiesQuery.error ||
           githubProfilesQuery.error ||
           weeklyPicksQuery.error,
       };
     },
-    [vcsQuery, graphQuery, trackedPeopleQuery, identitiesQuery, githubProfilesQuery, weeklyPicksQuery],
+    [vcsQuery, trackedPeopleQuery, identitiesQuery, githubProfilesQuery, weeklyPicksQuery],
   );
 }
 

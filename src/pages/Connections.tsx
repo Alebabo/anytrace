@@ -22,6 +22,7 @@ import {
 } from "@/hooks/useAnytrace";
 import type { PersonIdentity, VcSource } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
+import { isGenericTrackedRole, personDisplayLabel } from "@/lib/personLabels";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
@@ -271,7 +272,12 @@ export default function ConnectionDetail() {
   const dossierConfidence = confidenceForDossier(networkPeople.length, !!githubProfile, socialIdentities.length);
   const hasGithubSignals = Boolean(githubProfile?.primaryRepoLabel || githubIdentity);
   const hasSocialPresence = Boolean(xIdentity || linkedinIdentity);
-  const primaryStatus = person?.roleTitle?.toLowerCase().includes("founder") ? "FOUNDER" : person?.roleTitle?.trim() || "TRACKED";
+  const primaryStatus =
+    person?.roleTitle?.toLowerCase().includes("founder")
+      ? "FOUNDER"
+      : person && !isGenericTrackedRole(person.roleTitle)
+        ? person.roleTitle.trim()
+        : "TRACKED";
   const secondaryStatus = hasGithubSignals ? "GITHUB" : hasSocialPresence ? "SOCIAL" : "PROFILE";
 
   const keySignals = useMemo(() => {
@@ -333,15 +339,8 @@ export default function ConnectionDetail() {
       });
     }
 
-    if (networkPeople.length > 0) {
-      facts.push({
-        label: "Followed by",
-        value: `${networkPeople.length} tracked VC${networkPeople.length === 1 ? "" : "s"}`,
-      });
-    }
-
     return facts.slice(0, 4);
-  }, [networkPeople.length, person]);
+  }, [person]);
 
   const repoName = githubProfile?.primaryRepoLabel?.split("/").at(-1) || githubProfile?.primaryRepoLabel || "No anchored repo yet";
   const repoDescription =
@@ -523,7 +522,7 @@ export default function ConnectionDetail() {
                         Network Watchers ({networkPeople.length})
                       </div>
                       <Link
-                        to="/graph"
+                        to={`/graph?focusPerson=${person.id}`}
                         className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#3f6aa1] transition-colors hover:text-[#264b78] hover:underline"
                       >
                         View all watchers
