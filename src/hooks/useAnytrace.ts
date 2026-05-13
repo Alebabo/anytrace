@@ -484,7 +484,7 @@ export function usePromoteSeedFollowAlert() {
 export function useUpdateSeedFollowAlertStatus() {
   const queryClient = useQueryClient();
 
-  return useStaticMutation(async (input: { alertId: string; status: "new" | "seen" | "archived" }) => {
+  return useStaticMutation(async (input: { alertId: string; status: "new" | "seen" | "liked" | "archived" }) => {
     const response = await fetch(`${getBackendBaseUrl()}/seed-follow-alerts/status`, {
       method: "POST",
       headers: {

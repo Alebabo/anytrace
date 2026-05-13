@@ -37,6 +37,10 @@ export function isArchivedSeedFollowAlert(alert: SeedFollowAlert) {
   return (alert.status || "").toLowerCase() === "archived";
 }
 
+export function isLikedSeedFollowAlert(alert: SeedFollowAlert) {
+  return (alert.status || "").toLowerCase() === "liked";
+}
+
 export function isActiveSeedFollowAlert(alert: SeedFollowAlert) {
   return !isPromotedSeedFollowAlert(alert);
 }

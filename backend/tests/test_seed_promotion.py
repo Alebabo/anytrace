@@ -125,12 +125,14 @@ class SeedFollowAlertPromotionTest(unittest.TestCase):
         self.assertEqual(result["vc"]["account_type"], "journalist")
         self.assertEqual(result["vc"]["tier"], 4)
 
-    def test_seed_follow_alert_status_can_be_archived_and_restored(self) -> None:
+    def test_seed_follow_alert_status_can_be_liked_archived_and_restored(self) -> None:
         alert = self._create_alert("dismissed_pick_test")
 
+        liked = self.db.update_seed_follow_alert_status(alert_id=alert["id"], status="liked")
         archived = self.db.update_seed_follow_alert_status(alert_id=alert["id"], status="archived")
         restored = self.db.update_seed_follow_alert_status(alert_id=alert["id"], status="new")
 
+        self.assertEqual(liked["status"], "liked")
         self.assertEqual(archived["status"], "archived")
         self.assertEqual(restored["status"], "new")
 

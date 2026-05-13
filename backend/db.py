@@ -1385,7 +1385,7 @@ class SupabaseDB:
         normalized_status = (status or "").strip().lower()
         if not normalized_alert_id:
             raise ValueError("alertId is required")
-        if normalized_status not in {"new", "seen", "archived"}:
+        if normalized_status not in {"new", "seen", "liked", "archived"}:
             raise ValueError("Unsupported alert status")
 
         alert = self._fetchone(

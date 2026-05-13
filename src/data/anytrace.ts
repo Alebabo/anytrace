@@ -210,7 +210,7 @@ export interface SeedFollowAlert {
   triggeringSeedAccounts: SeedFollowerAccount[];
   seedFollowers: SeedFollowerAccount[];
   currentSeedFollowerCount: number;
-  status: "new" | "seen" | "archived" | string;
+  status: "new" | "seen" | "liked" | "archived" | string;
   promotedVcId?: string | null;
   promotedAt?: string | null;
 }

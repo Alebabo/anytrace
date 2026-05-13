@@ -1,4 +1,4 @@
-import { ArrowUpRight, Bell, Clock, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowUpRight, Bell, Clock, Heart, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { SeedPromotionDialog } from "@/components/anytrace/SeedPromotionDialog";
@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, useAppSettings, useSeedFollowAlerts, useUpdateSeedFollowAlertStatus } from "@/hooks/useAnytrace";
 import type { SeedFollowAlert } from "@/data/anytrace";
-import { isVisibleSeedFollowAlert } from "@/lib/seedFollowAlerts";
+import { isLikedSeedFollowAlert, isVisibleSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
 function formatTime(value?: string | null) {
   if (!value) return "Unknown time";
@@ -25,15 +25,18 @@ function AlertPickCard({
   alert,
   rank,
   onPromote,
+  onToggleLike,
   onDismiss,
   busy,
 }: {
   alert: SeedFollowAlert;
   rank: number;
   onPromote: (alert: SeedFollowAlert) => void;
+  onToggleLike: (alert: SeedFollowAlert) => void;
   onDismiss: (alert: SeedFollowAlert) => void;
   busy: boolean;
 }) {
+  const liked = isLikedSeedFollowAlert(alert);
   const triggerThreshold = alert.alertThreshold ?? 2;
   const triggerNames = alert.triggeringSeedAccounts
     .slice(0, triggerThreshold)
@@ -53,6 +56,12 @@ function AlertPickCard({
               <Clock className="h-3.5 w-3.5" />
               {formatTime(alert.triggeredAt)}
             </span>
+            {liked ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-1 font-medium text-rose-700">
+                <Heart className="h-3.5 w-3.5 fill-current" />
+                Liked
+              </span>
+            ) : null}
           </div>
           <h2 className="mt-3 truncate text-xl font-medium">{alert.displayName}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -60,6 +69,16 @@ function AlertPickCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
+          <Button
+            type="button"
+            variant={liked ? "default" : "outline"}
+            size="sm"
+            className="rounded-md"
+            disabled={busy}
+            onClick={() => onToggleLike(alert)}
+          >
+            {liked ? "Liked" : "Like"} <Heart className={`h-3.5 w-3.5 ${liked ? "fill-current" : ""}`} />
+          </Button>
           <Button type="button" variant="outline" size="sm" className="rounded-md" disabled={busy} onClick={() => onDismiss(alert)}>
             Dismiss <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -146,6 +165,12 @@ export default function TopPicksPage() {
                 alert={alert}
                 rank={index + 1}
                 onPromote={setPromotionAlert}
+                onToggleLike={(target) =>
+                  updateAlertStatus.mutate({
+                    alertId: target.id,
+                    status: isLikedSeedFollowAlert(target) ? "new" : "liked",
+                  })
+                }
                 onDismiss={(target) => updateAlertStatus.mutate({ alertId: target.id, status: "archived" })}
                 busy={updateAlertStatus.isPending}
               />

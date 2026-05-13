@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SeedFollowAlert } from "@/data/anytrace";
-import { buildSeedPromotionDraft, isActiveSeedFollowAlert, isVisibleSeedFollowAlert } from "@/lib/seedFollowAlerts";
+import {
+  buildSeedPromotionDraft,
+  isActiveSeedFollowAlert,
+  isLikedSeedFollowAlert,
+  isVisibleSeedFollowAlert,
+} from "@/lib/seedFollowAlerts";
 
 function makeAlert(overrides: Partial<SeedFollowAlert> = {}): SeedFollowAlert {
   return {
@@ -69,5 +74,12 @@ describe("seed follow alert helpers", () => {
     expect(isVisibleSeedFollowAlert(makeAlert())).toBe(true);
     expect(isVisibleSeedFollowAlert(makeAlert({ status: "archived" }))).toBe(false);
     expect(isActiveSeedFollowAlert(makeAlert({ status: "archived" }))).toBe(true);
+  });
+
+  it("keeps liked alerts visible while marking their state", () => {
+    const liked = makeAlert({ status: "liked" });
+
+    expect(isLikedSeedFollowAlert(liked)).toBe(true);
+    expect(isVisibleSeedFollowAlert(liked)).toBe(true);
   });
 });

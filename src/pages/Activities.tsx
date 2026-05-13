@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { ArrowUpRight, Bell, Clock, RotateCcw, Search, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowUpRight, Bell, Clock, Heart, RotateCcw, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { SeedPromotionDialog } from "@/components/anytrace/SeedPromotionDialog";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessState, useAppSettings, useSeedFollowAlerts, useUpdateSeedFollowAlertStatus } from "@/hooks/useAnytrace";
 import type { SeedFollowAlert, SeedFollowerAccount } from "@/data/anytrace";
-import { isActiveSeedFollowAlert, isArchivedSeedFollowAlert } from "@/lib/seedFollowAlerts";
+import { isActiveSeedFollowAlert, isArchivedSeedFollowAlert, isLikedSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
-type AlertFilter = "all" | "today" | "this-week" | "seen" | "archived" | "multi-follow" | "threshold-only";
-const ALERT_FILTER_OPTIONS: AlertFilter[] = ["all", "today", "this-week", "multi-follow", "threshold-only", "seen", "archived"];
+type AlertFilter = "all" | "today" | "this-week" | "liked" | "seen" | "archived" | "multi-follow" | "threshold-only";
+const ALERT_FILTER_OPTIONS: AlertFilter[] = ["all", "today", "this-week", "liked", "multi-follow", "threshold-only", "seen", "archived"];
 
 function formatTime(value?: string | null) {
   if (!value) return "Unknown time";
@@ -66,6 +66,9 @@ function matchesFilter(alert: SeedFollowAlert, filter: AlertFilter, activeThresh
   if (filter === "this-week") {
     return !archived && isThisWeek(alert.triggeredAt);
   }
+  if (filter === "liked") {
+    return !archived && isLikedSeedFollowAlert(alert);
+  }
   if (filter === "seen" || filter === "archived") {
     return filter === "archived" ? archived : (alert.status || "").toLowerCase() === filter;
   }
@@ -86,6 +89,8 @@ function filterLabel(filter: AlertFilter, activeThreshold = 2) {
       return "Today";
     case "this-week":
       return "This Week";
+    case "liked":
+      return "Liked";
     case "seen":
       return "Seen";
     case "archived":
@@ -116,6 +121,7 @@ function AlertLogRow({
   const triggeringSeeds = alert.triggeringSeedAccounts.slice(0, triggerThreshold);
   const laterSeeds = Math.max(0, alert.currentSeedFollowerCount - triggeringSeeds.length);
   const archived = isArchivedSeedFollowAlert(alert);
+  const liked = isLikedSeedFollowAlert(alert);
 
   return (
     <Card className="rounded-lg border-border p-4 shadow-none">
@@ -130,6 +136,12 @@ function AlertLogRow({
               <Clock className="h-3.5 w-3.5" />
               {formatTime(alert.triggeredAt)}
             </span>
+            {liked ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-1 font-medium text-rose-700">
+                <Heart className="h-3.5 w-3.5 fill-current" />
+                Liked
+              </span>
+            ) : null}
           </div>
 
           <h2 className="mt-3 truncate text-xl font-medium">{alert.displayName}</h2>
