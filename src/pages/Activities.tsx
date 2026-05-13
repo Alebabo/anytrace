@@ -1,5 +1,6 @@
-import { useDeferredValue, useMemo, useState } from "react";
-import { ArrowUpRight, Bell, Clock, Heart, RotateCcw, Search, Trash2, UserPlus, Users } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { ArrowUpRight, Bell, Clock, Heart, RotateCcw, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { SeedPromotionDialog } from "@/components/anytrace/SeedPromotionDialog";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,23 @@ import { useAccessState, useAppSettings, useSeedFollowAlerts, useUpdateSeedFollo
 import type { SeedFollowAlert, SeedFollowerAccount } from "@/data/anytrace";
 import { isActiveSeedFollowAlert, isArchivedSeedFollowAlert, isLikedSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
-type AlertFilter = "all" | "today" | "this-week" | "liked" | "seen" | "archived" | "multi-follow" | "threshold-only";
-const ALERT_FILTER_OPTIONS: AlertFilter[] = ["all", "today", "this-week", "liked", "multi-follow", "threshold-only", "seen", "archived"];
+type AlertFilter = "top-picks" | "all" | "today" | "this-week" | "liked" | "seen" | "archived" | "multi-follow" | "threshold-only";
+const ALERT_FILTER_OPTIONS: AlertFilter[] = [
+  "top-picks",
+  "all",
+  "today",
+  "this-week",
+  "liked",
+  "multi-follow",
+  "threshold-only",
+  "seen",
+  "archived",
+];
+const DEFAULT_ALERT_FILTER: AlertFilter = "top-picks";
+
+function normalizeAlertFilter(value?: string | null): AlertFilter {
+  return ALERT_FILTER_OPTIONS.includes(value as AlertFilter) ? (value as AlertFilter) : DEFAULT_ALERT_FILTER;
+}
 
 function formatTime(value?: string | null) {
   if (!value) return "Unknown time";
@@ -59,6 +75,9 @@ function isThisWeek(value?: string | null) {
 
 function matchesFilter(alert: SeedFollowAlert, filter: AlertFilter, activeThreshold = 2) {
   const archived = isArchivedSeedFollowAlert(alert);
+  if (filter === "top-picks") {
+    return !archived && alert.currentSeedFollowerCount >= activeThreshold;
+  }
   if (filter === "all") return !archived;
   if (filter === "today") {
     return !archived && isToday(alert.triggeredAt);
@@ -83,6 +102,8 @@ function matchesFilter(alert: SeedFollowAlert, filter: AlertFilter, activeThresh
 
 function filterLabel(filter: AlertFilter, activeThreshold = 2) {
   switch (filter) {
+    case "top-picks":
+      return "Top Picks";
     case "all":
       return "All";
     case "today":
@@ -107,15 +128,19 @@ function filterLabel(filter: AlertFilter, activeThreshold = 2) {
 function AlertLogRow({
   alert,
   onPromote,
+  onToggleLike,
   onArchive,
   onRestore,
   busy,
+  rank,
 }: {
   alert: SeedFollowAlert;
   onPromote: (alert: SeedFollowAlert) => void;
+  onToggleLike: (alert: SeedFollowAlert) => void;
   onArchive: (alert: SeedFollowAlert) => void;
   onRestore: (alert: SeedFollowAlert) => void;
   busy: boolean;
+  rank?: number;
 }) {
   const triggerThreshold = alert.alertThreshold ?? 2;
   const triggeringSeeds = alert.triggeringSeedAccounts.slice(0, triggerThreshold);
@@ -129,8 +154,8 @@ function AlertLogRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">
-              <Bell className="h-3.5 w-3.5" />
-              Alert created
+              {rank ? <Sparkles className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+              {rank ? `#${rank}` : "Alert created"}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
@@ -166,6 +191,16 @@ function AlertLogRow({
             </Button>
           ) : (
             <>
+              <Button
+                type="button"
+                variant={liked ? "default" : "outline"}
+                size="sm"
+                className="rounded-md"
+                disabled={busy}
+                onClick={() => onToggleLike(alert)}
+              >
+                {liked ? "Liked" : "Like"} <Heart className={`h-3.5 w-3.5 ${liked ? "fill-current" : ""}`} />
+              </Button>
               <Button type="button" variant="outline" size="sm" className="rounded-md" disabled={busy} onClick={() => onArchive(alert)}>
                 Dismiss <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -179,6 +214,13 @@ function AlertLogRow({
               Open X <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           </Button>
+          {alert.linkedinUrl ? (
+            <Button asChild variant="outline" size="sm" className="rounded-md">
+              <a href={alert.linkedinUrl} target="_blank" rel="noreferrer">
+                LinkedIn <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+            </Button>
+          ) : null}
         </div>
       </div>
     </Card>
@@ -187,15 +229,36 @@ function AlertLogRow({
 
 export default function ActivitiesPage() {
   const { access } = useAccessState();
+  const [searchParams, setSearchParams] = useSearchParams();
   const appSettings = useAppSettings(access.isAuthenticated);
   const alertsQuery = useSeedFollowAlerts(access.isAuthenticated);
   const updateAlertStatus = useUpdateSeedFollowAlertStatus();
   const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<AlertFilter>("all");
+  const [activeFilter, setActiveFilter] = useState<AlertFilter>(() => normalizeAlertFilter(searchParams.get("filter")));
   const [promotionAlert, setPromotionAlert] = useState<SeedFollowAlert | null>(null);
   const deferredQuery = useDeferredValue(query);
   const allAlerts = useMemo(() => (alertsQuery.data ?? []).filter(isActiveSeedFollowAlert), [alertsQuery.data]);
   const activeThreshold = appSettings.data?.seedFollowAlertThreshold ?? 2;
+
+  useEffect(() => {
+    setActiveFilter(normalizeAlertFilter(searchParams.get("filter")));
+  }, [searchParams]);
+
+  function selectFilter(filter: AlertFilter) {
+    setActiveFilter(filter);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (filter === DEFAULT_ALERT_FILTER) {
+          next.delete("filter");
+        } else {
+          next.set("filter", filter);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
 
   const filterCounts = useMemo(
     () =>
@@ -224,26 +287,32 @@ export default function ActivitiesPage() {
           .toLowerCase()
           .includes(search);
       })
-      .sort((left, right) => new Date(right.triggeredAt || 0).getTime() - new Date(left.triggeredAt || 0).getTime());
+      .sort((left, right) => {
+        if (activeFilter === "top-picks") {
+          const countDiff = right.currentSeedFollowerCount - left.currentSeedFollowerCount;
+          if (countDiff !== 0) return countDiff;
+        }
+        return new Date(right.triggeredAt || 0).getTime() - new Date(left.triggeredAt || 0).getTime();
+      });
   }, [activeFilter, activeThreshold, allAlerts, deferredQuery]);
 
   const seedAccountCount = new Set(alerts.flatMap((alert) => alert.seedFollowers.map((seed) => seed.id))).size;
 
   return (
     <ProductGate
-      title="Alert Log"
-      description={`Audit trail of seed-follow alerts. Current threshold: ${activeThreshold}.`}
+      title="Alerts"
+      description={`Top picks and full seed-follow history. Current threshold: ${activeThreshold}.`}
     >
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-8 md:py-10">
         <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               <Bell className="h-3.5 w-3.5" />
-              Alert history
+              Seed-follow alerts
             </div>
-            <h1 className="text-3xl font-medium md:text-4xl">Every qualified seed-follow alert</h1>
+            <h1 className="text-3xl font-medium md:text-4xl">Top picks and alert history</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Historical alerts stay visible here; the current setting controls new alerts and active Inbox qualification.
+              Review the strongest current picks first, then drop into the full log when you need history.
             </p>
           </div>
           <div className="rounded-lg border border-border px-4 py-3">
@@ -271,7 +340,7 @@ export default function ActivitiesPage() {
               <button
                 key={filter}
                 type="button"
-                onClick={() => setActiveFilter(filter)}
+                onClick={() => selectFilter(filter)}
                 className={[
                   "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
                   isActive
@@ -298,18 +367,27 @@ export default function ActivitiesPage() {
           </div>
         ) : alerts.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground">
-            No qualified alerts yet. Run the seed scan from the Inbox to start building this history.
+            {activeFilter === "top-picks"
+              ? `No active top picks at the ${activeThreshold}-seed threshold.`
+              : "No qualified alerts yet. Run the seed scan from the Inbox to start building this history."}
           </div>
         ) : (
           <div className="space-y-3">
-            {alerts.map((alert) => (
+            {alerts.map((alert, index) => (
               <AlertLogRow
                 key={alert.id}
                 alert={alert}
                 onPromote={setPromotionAlert}
+                onToggleLike={(target) =>
+                  updateAlertStatus.mutate({
+                    alertId: target.id,
+                    status: isLikedSeedFollowAlert(target) ? "new" : "liked",
+                  })
+                }
                 onArchive={(target) => updateAlertStatus.mutate({ alertId: target.id, status: "archived" })}
                 onRestore={(target) => updateAlertStatus.mutate({ alertId: target.id, status: "new" })}
                 busy={updateAlertStatus.isPending}
+                rank={activeFilter === "top-picks" ? index + 1 : undefined}
               />
             ))}
           </div>

@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,7 +11,6 @@ const MainDashboard = lazy(() => import("@/pages/Index"));
 const GraphPage = lazy(() => import("@/pages/Explore"));
 const ActivitiesPage = lazy(() => import("@/pages/Activities"));
 const WatchlistPage = lazy(() => import("@/pages/Watchlist"));
-const TopPicksPage = lazy(() => import("@/pages/TopPicks"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const ConnectionDetail = lazy(() => import("@/pages/Connections"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
@@ -50,7 +49,7 @@ const App = () => (
               <Route path="/graph" element={<GraphPage />} />
               <Route path="/activities" element={<ActivitiesPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
-              <Route path="/top-picks" element={<TopPicksPage />} />
+              <Route path="/top-picks" element={<Navigate to="/activities?filter=top-picks" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/connections/:id" element={<ConnectionDetail />} />
             </Route>

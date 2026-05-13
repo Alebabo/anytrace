@@ -8,7 +8,6 @@ import {
   Activity,
   Bell,
   Users,
-  Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -26,9 +25,8 @@ type NavItem = {
 const nav: NavItem[] = [
   { to: "/", label: "Inbox", icon: Bell },
   { to: "/graph", label: "Graph", icon: Network },
-  { to: "/activities", label: "Alert Log", icon: Activity },
+  { to: "/activities", label: "Alerts", icon: Activity },
   { to: "/watchlist", label: "Watchlist", icon: Users },
-  { to: "/top-picks", label: "Top Picks", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
