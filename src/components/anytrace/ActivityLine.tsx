@@ -123,6 +123,20 @@ function formatFallbackLine(event: ActivityEvent, personName?: string) {
   }
 
   if (event.eventType === "mention") {
+    const actorLabel = asString(event.metadata.actorLabel);
+    const targetLabel = asString(event.metadata.targetLabel) || personName || "this person";
+
+    if (event.platform === "x" && actorLabel) {
+      return (
+        <>
+          <span className="font-semibold text-foreground">{actorLabel}</span>
+          <span> followed </span>
+          <span className="font-semibold text-foreground">{targetLabel}</span>
+          <span> on X</span>
+        </>
+      );
+    }
+
     return (
       <>
         <span className="font-semibold text-foreground">{personName || "This person"}</span>

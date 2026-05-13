@@ -9,8 +9,8 @@ from backend.alerts.email_alert import EmailAlertService
 from backend.db import SupabaseDB
 from backend.engine.news_engine import NewsEngine
 from backend.engine.score_engine import ScoreEngine
+from backend.linkedin_make import trigger_linkedin_make
 from backend.scrapers.github_scraper import GithubScraper
-from backend.scrapers.linkedin_scraper import LinkedInScraper
 from backend.scrapers.twitter_scraper import TwitterFollowingScraper
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,8 @@ def run_score_job() -> None:
 
 
 def run_linkedin_job() -> None:
-    LinkedInScraper().run_all()
+    result = trigger_linkedin_make()
+    logger.info("LinkedIn Make job sent %s profiles", result.get("sent", 0))
 
 
 def run_news_and_alert_job() -> None:

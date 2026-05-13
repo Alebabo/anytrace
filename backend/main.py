@@ -15,9 +15,9 @@ from backend.db import SupabaseDB
 from backend.engine.identity_matcher import IdentityMatcher
 from backend.engine.news_engine import NewsEngine
 from backend.engine.score_engine import ScoreEngine
+from backend.linkedin_make import trigger_linkedin_make
 from backend.scheduler import start_scheduler
 from backend.scrapers.github_scraper import GithubScraper
-from backend.scrapers.linkedin_scraper import LinkedInScraper
 from backend.scrapers.twitter_scraper import TwitterFollowingScraper
 
 
@@ -41,7 +41,7 @@ def run_github():
 
 def run_twitter():
     results = TwitterFollowingScraper().run_all()
-    logging.getLogger(__name__).info("Twitter run completed for %s VCs", len(results))
+    logging.getLogger(__name__).info("Twitter run completed for %s seed sources", len(results))
     return results
 
 
@@ -51,9 +51,10 @@ def run_scores() -> None:
     logging.getLogger(__name__).info("Score run completed for %s candidates", len(results))
 
 
-def run_linkedin() -> None:
-    results = LinkedInScraper().run_all()
-    logging.getLogger(__name__).info("LinkedIn run completed for %s candidates", len(results))
+def run_linkedin() -> dict:
+    result = trigger_linkedin_make()
+    logging.getLogger(__name__).info("LinkedIn Make run sent %s profiles", result.get("sent", 0))
+    return result
 
 
 def run_news() -> None:
@@ -84,7 +85,7 @@ def run_pipeline() -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Anytrace VC signal backend")
+    parser = argparse.ArgumentParser(description="Anytrace seed-source signal backend")
     parser.add_argument(
         "command",
         choices=[

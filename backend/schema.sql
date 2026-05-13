@@ -102,6 +102,24 @@ create table if not exists vcs (
   added_at timestamptz default now()
 );
 
+create table if not exists vc_clusters (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+
+create table if not exists vc_cluster_members (
+  id uuid primary key default gen_random_uuid(),
+  cluster_id uuid not null references vc_clusters(id) on delete cascade,
+  vc_id uuid not null references vcs(id) on delete cascade unique,
+  account_type text not null default 'firm',
+  is_primary boolean default false,
+  confidence numeric(5,2) default 1.0,
+  source text default 'manual',
+  created_at timestamptz default now(),
+  unique (cluster_id, vc_id)
+);
+
 create table if not exists twitter_following_snapshots (
   id uuid primary key default gen_random_uuid(),
   vc_id uuid references vcs(id) on delete cascade,
@@ -133,6 +151,63 @@ create table if not exists twitter_vc_follows (
   last_seen_at date,
   unique(candidate_id, vc_id)
 );
+
+create table if not exists discovered_people (
+  id text primary key,
+  x_handle text not null unique,
+  display_name text,
+  primary_profile_url text not null,
+  github_url text,
+  linkedin_url text,
+  first_seen_at timestamptz default now(),
+  last_seen_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+
+create table if not exists seed_follow_observations (
+  id uuid primary key default gen_random_uuid(),
+  seed_vc_id uuid references vcs(id) on delete cascade,
+  discovered_person_id text references discovered_people(id) on delete cascade,
+  followed_handle text not null,
+  first_seen_at timestamptz default now(),
+  last_seen_at timestamptz default now(),
+  created_at timestamptz default now(),
+  unique(seed_vc_id, discovered_person_id)
+);
+
+create table if not exists seed_follow_alert_events (
+  id text primary key,
+  discovered_person_id text references discovered_people(id) on delete cascade unique,
+  triggered_at timestamptz default now(),
+  triggering_seed_accounts jsonb default '[]'::jsonb,
+  trigger_threshold int default 2,
+  status text default 'new',
+  promoted_vc_id uuid references vcs(id) on delete set null,
+  promoted_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create table if not exists app_settings (
+  key text primary key,
+  value text not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists linkedin_enrichment_events (
+  id text primary key,
+  discovered_person_id text references discovered_people(id) on delete cascade,
+  linkedin_url text,
+  headline text,
+  role_title text,
+  company text,
+  location text,
+  source text default 'make',
+  raw_payload jsonb default '{}'::jsonb,
+  observed_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+create index if not exists linkedin_enrichment_person_idx on linkedin_enrichment_events(discovered_person_id, observed_at desc);
 
 create table if not exists tracked_person_twitter_following_snapshots (
   id uuid primary key default gen_random_uuid(),

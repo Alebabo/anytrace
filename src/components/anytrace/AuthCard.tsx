@@ -19,7 +19,7 @@ export function AuthCard() {
       </div>
       <h2 className="font-serif text-3xl leading-tight">Anytrace workspace</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        Sign in with a Supabase magic link so only your own workspace and your own tracked data stay visible.
+        Local access is active. The app fetches live data from your local backend first and only falls back to seed data if that backend is temporarily unavailable.
       </p>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -71,7 +71,7 @@ export function AuthCard() {
 
       {isSuccess && (
         <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700">
-          Magic link sent. Open it from your inbox on this device to continue.
+          Local access is active.
         </div>
       )}
 
@@ -87,7 +87,7 @@ export function AuthCard() {
           Access
         </div>
         <p className="mt-2 leading-relaxed">
-          If email delivery fails, check `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, your Supabase Auth email setup, and the redirect URL in `VITE_SITE_URL`.
+          Backend-first mode is enabled. Manual additions stay in browser storage on this device, and backend data is retried automatically until it is available.
         </p>
       </div>
     </div>

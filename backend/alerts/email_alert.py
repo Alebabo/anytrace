@@ -21,7 +21,7 @@ class EmailAlertService:
     @classmethod
     def build(cls, db: SupabaseDB | None = None, settings: Settings | None = None) -> "EmailAlertService":
         cfg = settings or get_settings()
-        validate_settings(cfg, "supabase", "smtp")
+        validate_settings(cfg, "smtp")
         return cls(db or SupabaseDB.from_settings(cfg), cfg)
 
     def _compose_email(self, candidate: dict, score: dict) -> EmailMessage:

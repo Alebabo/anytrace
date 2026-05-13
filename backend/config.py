@@ -15,6 +15,7 @@ def _env(name: str, default: str | None = None, *, required: bool = False) -> st
 class Settings:
     supabase_url: str
     supabase_key: str
+    local_db_path: str
     twitter_provider: str
     twitter_state_backend: str
     twitter_local_db_path: str
@@ -27,6 +28,8 @@ class Settings:
     tweetapi_base_url: str
     tweetapi_page_size: int
     tweetapi_max_pages: int
+    tweetapi_incremental_min_pages: int
+    tweetapi_deep_scan_interval_hours: int
     twitter_request_timeout_seconds: int
     github_token: str
     li_username: str
@@ -49,6 +52,11 @@ class Settings:
     github_viral_min_stars: int
     github_viral_min_star_delta_7d: int
     github_viral_pushed_within_days: int
+    make_linkedin_webhook_url: str
+    make_linkedin_webhook_secret: str
+    make_linkedin_batch_limit: int
+    public_api_base_url: str
+    seed_follow_alert_threshold: int
     linkedin_min_delay_seconds: int
     linkedin_max_delay_seconds: int
 
@@ -56,8 +64,7 @@ class Settings:
 def validate_settings(settings: Settings, *scopes: str) -> None:
     required_by_scope = {
         "supabase": {
-            "SUPABASE_URL": settings.supabase_url,
-            "SUPABASE_KEY": settings.supabase_key,
+            "ANYTRACE_LOCAL_DB_PATH": settings.local_db_path,
         },
         "twitter": {
             "TWITTER_USERNAME": settings.twitter_username,
@@ -93,18 +100,21 @@ def get_settings() -> Settings:
     return Settings(
         supabase_url=_env("SUPABASE_URL", ""),
         supabase_key=_env("SUPABASE_KEY", ""),
+        local_db_path=_env("ANYTRACE_LOCAL_DB_PATH", "backend/local_data/anytrace.db").strip(),
         twitter_provider=_env("TWITTER_PROVIDER", "auto").strip().lower(),
-        twitter_state_backend=_env("TWITTER_STATE_BACKEND", "supabase").strip().lower(),
+        twitter_state_backend=_env("TWITTER_STATE_BACKEND", "local").strip().lower(),
         twitter_local_db_path=_env("TWITTER_LOCAL_DB_PATH", "backend/local_data/twitter_state.db").strip(),
         twitter_username=_env("TWITTER_USERNAME", ""),
         twitter_password=_env("TWITTER_PASSWORD", ""),
         twitter_verification=_env("TWITTER_VERIFICATION", ""),
         twitter_max_scrolls=int(_env("TWITTER_MAX_SCROLLS", "60")),
         twitter_snapshot_max_rows=int(_env("TWITTER_SNAPSHOT_MAX_ROWS", "100")),
-        tweetapi_key=_env("TWEETAPI_KEY", _env("TWITTERAPI_IO_KEY", "")),
+        tweetapi_key=_env("TWEETAPI_KEY", ""),
         tweetapi_base_url=_env("TWEETAPI_BASE_URL", "https://api.tweetapi.com/tw-v2").strip(),
-        tweetapi_page_size=int(_env("TWEETAPI_PAGE_SIZE", _env("TWITTERAPI_IO_PAGE_SIZE", "100"))),
-        tweetapi_max_pages=int(_env("TWEETAPI_MAX_PAGES", _env("TWITTERAPI_IO_MAX_PAGES", "3"))),
+        tweetapi_page_size=int(_env("TWEETAPI_PAGE_SIZE", "100")),
+        tweetapi_max_pages=int(_env("TWEETAPI_MAX_PAGES", "6")),
+        tweetapi_incremental_min_pages=int(_env("TWEETAPI_INCREMENTAL_MIN_PAGES", "2")),
+        tweetapi_deep_scan_interval_hours=int(_env("TWEETAPI_DEEP_SCAN_INTERVAL_HOURS", "20")),
         twitter_request_timeout_seconds=int(_env("TWITTER_REQUEST_TIMEOUT_SECONDS", "30")),
         github_token=_env("GITHUB_TOKEN", ""),
         li_username=_env("LI_USERNAME", ""),
@@ -127,6 +137,11 @@ def get_settings() -> Settings:
         github_viral_min_stars=int(_env("GITHUB_VIRAL_MIN_STARS", "150")),
         github_viral_min_star_delta_7d=int(_env("GITHUB_VIRAL_MIN_STAR_DELTA_7D", "25")),
         github_viral_pushed_within_days=int(_env("GITHUB_VIRAL_PUSHED_WITHIN_DAYS", "10")),
+        make_linkedin_webhook_url=_env("MAKE_LINKEDIN_WEBHOOK_URL", "").strip(),
+        make_linkedin_webhook_secret=_env("MAKE_LINKEDIN_WEBHOOK_SECRET", _env("LINKEDIN_MAKE_WEBHOOK_SECRET", "")).strip(),
+        make_linkedin_batch_limit=int(_env("MAKE_LINKEDIN_BATCH_LIMIT", "25")),
+        public_api_base_url=_env("ANYTRACE_PUBLIC_API_BASE_URL", "").strip().rstrip("/"),
+        seed_follow_alert_threshold=int(_env("SEED_FOLLOW_ALERT_THRESHOLD", "2")),
         linkedin_min_delay_seconds=int(_env("LINKEDIN_MIN_DELAY_SECONDS", "30")),
         linkedin_max_delay_seconds=int(_env("LINKEDIN_MAX_DELAY_SECONDS", "90")),
     )

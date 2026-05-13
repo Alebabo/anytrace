@@ -1,9 +1,5 @@
 import type { PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 
-function getBackendBaseUrl() {
-  return import.meta.env.VITE_ANYTRACE_BACKEND_URL?.trim() || "http://127.0.0.1:8766";
-}
-
 function normalizeHandle(handle?: string | null) {
   return handle?.replace(/^@/, "").trim() || null;
 }
@@ -69,19 +65,6 @@ function githubAvatar(username?: string | null, size = 160) {
   return `https://github.com/${normalizedUsername}.png?size=${size}`;
 }
 
-function avatarProxyUrl(platform: "x" | "linkedin" | "github", value?: string | null) {
-  if (!value) return null;
-
-  const endpoint = new URL("/avatar-proxy", getBackendBaseUrl());
-  endpoint.searchParams.set("platform", platform);
-  if (platform === "linkedin") {
-    endpoint.searchParams.set("profile_url", value);
-  } else {
-    endpoint.searchParams.set("handle", value);
-  }
-  return endpoint.toString();
-}
-
 function uniqueStrings(values: Array<string | null | undefined>) {
   return [...new Set(values.filter((value): value is string => !!value))];
 }
@@ -107,9 +90,6 @@ export function avatarSourcesForPerson(
 
   return uniqueStrings([
     person.avatarUrl ?? null,
-    avatarProxyUrl("github", github),
-    avatarProxyUrl("x", x),
-    avatarProxyUrl("linkedin", linkedin),
     unavatarLinkedin(linkedin, person.fullName),
     githubAvatar(github),
     unavatarX(x, person.fullName),
@@ -121,9 +101,6 @@ export function avatarSourcesForVc(vc: VcSource) {
   const xHandle = normalizeHandle(vc.xHandle) ?? lastPathSegment(vc.twitterUrl);
 
   return uniqueStrings([
-    avatarProxyUrl("x", xHandle),
-    avatarProxyUrl("linkedin", vc.linkedinUrl),
-    avatarProxyUrl("github", vc.githubUsername),
     unavatarLinkedin(vc.linkedinUrl, vc.name),
     unavatarX(xHandle, vc.name),
     unavatarTwitter(xHandle, vc.name),

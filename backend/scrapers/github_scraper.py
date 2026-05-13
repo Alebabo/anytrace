@@ -8,6 +8,12 @@ import requests
 
 from backend.config import Settings, get_settings, validate_settings
 from backend.db import SupabaseDB, normalize_handle
+from backend.scrapers.tweetapi_provider import (
+    TweetApiError,
+    TweetApiFollowingProvider,
+    TweetApiPrivateAccountError,
+    TweetApiRateLimitError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +46,10 @@ class GithubScanSummary:
 
 class GithubScraper:
     base_url = "https://api.github.com"
-    twitterapi_base_url = "https://api.twitterapi.io"
 
     def __init__(self, db: SupabaseDB | None = None, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
-        validate_settings(self.settings, "supabase", "github")
+        validate_settings(self.settings, "github")
         self.db = db or SupabaseDB.from_settings(self.settings)
         self.session = requests.Session()
         self.session.headers.update(
@@ -54,11 +59,20 @@ class GithubScraper:
                 "X-GitHub-Api-Version": "2022-11-28",
             }
         )
-        self.twitter_session = requests.Session()
-        if self.settings.tweetapi_key:
-            self.twitter_session.headers.update({"x-api-key": self.settings.tweetapi_key})
+        self.tweetapi_provider = TweetApiFollowingProvider(self.settings, self.db) if self.settings.tweetapi_key else None
+        if self.tweetapi_provider is None:
+            logger.warning("TWEETAPI_KEY is not configured; GitHub X cross-verification is disabled for this run.")
         self._x_follow_relationship_cache: dict[tuple[str, str], bool] = {}
         self._important_x_followers_cache: dict[str, list[dict]] = {}
+        self._x_verification_temporarily_disabled = False
+
+    def _should_cross_verify_viral_repo(self, *, stars: int, star_delta_7d: int, star_delta_30d: int) -> bool:
+        # Reserve expensive X verification for genuinely strong repo candidates.
+        if star_delta_7d >= max(self.settings.github_viral_min_star_delta_7d, 75):
+            return True
+        if star_delta_30d >= max(self.settings.github_viral_min_star_delta_7d * 2, 150):
+            return True
+        return stars >= 1000 and star_delta_7d >= self.settings.github_viral_min_star_delta_7d
 
     def _fetch_repos(self, username: str) -> list[dict]:
         repos: list[dict] = []
@@ -138,7 +152,7 @@ class GithubScraper:
         return response.json()
 
     def _check_x_follow_relationship(self, *, source_handle: str, target_handle: str) -> bool:
-        if not self.settings.tweetapi_key:
+        if self.tweetapi_provider is None or self._x_verification_temporarily_disabled:
             return False
 
         cache_key = (source_handle.lower(), target_handle.lower())
@@ -146,24 +160,16 @@ class GithubScraper:
         if cached is not None:
             return cached
 
-        response = self.twitter_session.get(
-            f"{self.twitterapi_base_url}/twitter/user/check_follow_relationship",
-            params={
-                "source_user_name": source_handle,
-                "target_user_name": target_handle,
-            },
-            timeout=self.settings.twitter_request_timeout_seconds,
+        is_following = self.tweetapi_provider.is_following(
+            source_account=source_handle,
+            target_account=target_handle,
         )
-        response.raise_for_status()
-        payload = response.json() or {}
-        data = payload.get("data") or {}
-        is_following = bool(data.get("following"))
         self._x_follow_relationship_cache[cache_key] = is_following
         return is_following
 
     def _find_important_x_followers(self, target_handle: str) -> list[dict]:
         normalized_target = normalize_handle(target_handle)
-        if not normalized_target or not self.settings.tweetapi_key:
+        if not normalized_target or self.tweetapi_provider is None:
             return []
 
         cached = self._important_x_followers_cache.get(normalized_target)
@@ -185,12 +191,20 @@ class GithubScraper:
                             "tier": vc.get("tier"),
                         }
                     )
-            except requests.HTTPError:
-                logger.exception(
-                    "X relationship lookup failed for @%s -> @%s",
+            except TweetApiPrivateAccountError:
+                logger.info(
+                    "Skipped X relationship lookup for @%s -> @%s because the source account is private.",
                     vc_handle,
                     normalized_target,
                 )
+            except TweetApiRateLimitError:
+                self._x_verification_temporarily_disabled = True
+                logger.warning(
+                    "Disabled GitHub X cross-verification for the rest of this run after TweetAPI rate limiting."
+                )
+                break
+            except (requests.HTTPError, TweetApiError):
+                logger.exception("X relationship lookup failed for @%s -> @%s", vc_handle, normalized_target)
             except ValueError:
                 logger.exception(
                     "X relationship lookup returned invalid JSON for @%s -> @%s",
@@ -552,7 +566,11 @@ class GithubScraper:
             except requests.HTTPError:
                 logger.exception("GitHub owner lookup failed for viral repo owner %s", repo_owner)
 
-            if owner_x_handle:
+            if owner_x_handle and self._should_cross_verify_viral_repo(
+                stars=stars,
+                star_delta_7d=star_delta_7d,
+                star_delta_30d=star_delta_30d,
+            ):
                 important_x_followers = self._find_important_x_followers(owner_x_handle)
 
             self.db.upsert_github_viral_repo_snapshot(

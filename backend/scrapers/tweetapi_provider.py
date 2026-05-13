@@ -19,6 +19,18 @@ class TweetApiFetchResult:
     output_file: str
 
 
+class TweetApiError(RuntimeError):
+    pass
+
+
+class TweetApiRateLimitError(TweetApiError):
+    pass
+
+
+class TweetApiPrivateAccountError(TweetApiError):
+    pass
+
+
 class TweetApiFollowingProvider:
     DEFAULT_BASE_URL = "https://api.tweetapi.com/tw-v2"
 
@@ -31,6 +43,7 @@ class TweetApiFollowingProvider:
         self.session = requests.Session()
         self.session.headers.update({"X-API-Key": settings.tweetapi_key})
         self.base_url = self._normalize_base_url(settings.tweetapi_base_url or self.DEFAULT_BASE_URL)
+        self._user_id_cache: dict[str, str] = {}
 
     def fetch_following(
         self,
@@ -46,6 +59,7 @@ class TweetApiFollowingProvider:
         cursor = ""
         stopped_early = False
         user_id = self._lookup_user_id(target_account)
+        incremental_min_pages = max(1, self.settings.tweetapi_incremental_min_pages)
 
         for page_index in range(self.settings.tweetapi_max_pages):
             response = self._request(
@@ -62,7 +76,6 @@ class TweetApiFollowingProvider:
                 raise RuntimeError("TweetAPI response did not contain a followings list")
 
             page_found_known_handle = False
-            page_new_handle_count = 0
             for item in followings:
                 handle = self._extract_handle(item)
                 if not handle or handle in seen_handles:
@@ -79,9 +92,13 @@ class TweetApiFollowingProvider:
                 if is_known_handle:
                     page_found_known_handle = True
                     continue
-                page_new_handle_count += 1
 
-            if not baseline_run and page_found_known_handle and page_new_handle_count == 0:
+            if (
+                not baseline_run
+                and last_known_handle
+                and page_found_known_handle
+                and page_index + 1 >= incremental_min_pages
+            ):
                 stopped_early = True
                 break
 
@@ -98,6 +115,46 @@ class TweetApiFollowingProvider:
         self._write_csv(output_file, rows)
         return TweetApiFetchResult(rows=rows, stopped_early=stopped_early, output_file=output_file)
 
+    def is_following(self, *, source_account: str, target_account: str) -> bool:
+        source_handle = normalize_handle(source_account)
+        target_handle = normalize_handle(target_account)
+        if not source_handle or not target_handle or source_handle == target_handle:
+            return False
+
+        cursor = ""
+        user_id = self._lookup_user_id(source_handle)
+
+        for page_index in range(self.settings.tweetapi_max_pages):
+            response = self._request(
+                "GET",
+                "/user/following-list",
+                params={
+                    "userId": user_id,
+                    "cursor": cursor,
+                    "count": self.settings.tweetapi_page_size,
+                },
+            )
+            followings = self._extract_followings(response)
+            if not isinstance(followings, list):
+                raise RuntimeError("TweetAPI response did not contain a followings list")
+
+            for item in followings:
+                handle = self._extract_handle(item)
+                if handle == target_handle:
+                    return True
+
+            if not response.get("has_next_page"):
+                break
+
+            cursor = str(response.get("next_cursor") or "")
+            if not cursor:
+                break
+
+            if page_index < self.settings.tweetapi_max_pages - 1:
+                time.sleep(0.15)
+
+        return False
+
     def _request(self, method: str, path: str, *, params: dict[str, str | int]) -> dict:
         last_error: Exception | None = None
 
@@ -110,7 +167,7 @@ class TweetApiFollowingProvider:
             )
 
             if response.status_code in {429, 500, 502, 503, 504}:
-                last_error = RuntimeError(f"TweetAPI transient error {response.status_code} for {path}")
+                last_error = TweetApiRateLimitError(f"TweetAPI transient error {response.status_code} for {path}")
                 time.sleep(2**attempt)
                 continue
 
@@ -121,14 +178,19 @@ class TweetApiFollowingProvider:
 
             if not response.ok:
                 detail = payload.get("detail") or payload.get("msg") or response.text
-                raise RuntimeError(f"TweetAPI request failed ({response.status_code}): {detail}")
+                detail_text = str(detail)
+                if response.status_code == 400 and "private" in detail_text.lower():
+                    raise TweetApiPrivateAccountError(f"TweetAPI request failed ({response.status_code}): {detail_text}")
+                if response.status_code == 429:
+                    raise TweetApiRateLimitError(f"TweetAPI request failed ({response.status_code}): {detail_text}")
+                raise TweetApiError(f"TweetAPI request failed ({response.status_code}): {detail_text}")
 
             if payload.get("status") == "error":
-                raise RuntimeError(f"TweetAPI semantic error: {payload.get('msg') or 'unknown error'}")
+                raise TweetApiError(f"TweetAPI semantic error: {payload.get('msg') or 'unknown error'}")
 
             return payload
 
-        raise RuntimeError(f"TweetAPI request failed after retries: {last_error}") from last_error
+        raise TweetApiRateLimitError(f"TweetAPI request failed after retries: {last_error}") from last_error
 
     @staticmethod
     def _normalize_base_url(base_url: str) -> str:
@@ -145,10 +207,18 @@ class TweetApiFollowingProvider:
         return f"{self.base_url}{clean_path}"
 
     def _lookup_user_id(self, user_name: str) -> str:
+        normalized_user_name = normalize_handle(user_name)
+        if not normalized_user_name:
+            raise TweetApiError("TweetAPI user lookup requires a valid username")
+
+        cached_user_id = self._user_id_cache.get(normalized_user_name)
+        if cached_user_id is not None:
+            return cached_user_id
+
         response = self._request(
             "GET",
             "/user/by-username",
-            params={"username": user_name},
+            params={"username": normalized_user_name},
         )
         user = response.get("data") or response.get("user") or response
         user_id = (
@@ -158,8 +228,10 @@ class TweetApiFollowingProvider:
             or user.get("user_id")
         )
         if not user_id:
-            raise RuntimeError(f"TweetAPI could not resolve user id for @{user_name}")
-        return str(user_id)
+            raise TweetApiError(f"TweetAPI could not resolve user id for @{normalized_user_name}")
+        resolved_user_id = str(user_id)
+        self._user_id_cache[normalized_user_name] = resolved_user_id
+        return resolved_user_id
 
     @staticmethod
     def _extract_handle(item: dict) -> str | None:

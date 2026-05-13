@@ -31,7 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAccessState, useGraphData, usePersonIdentities, useRefreshAnytraceData } from "@/hooks/useAnytrace";
-import type { ActivityPlatform, IdentityPlatform, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
+import type { ActivityPlatform, GraphEdge, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 import { personDisplayLabel } from "@/lib/personLabels";
 
@@ -142,6 +142,15 @@ const nodeTypes = {
 };
 
 const GRAPH_FILTER_PREFS_KEY = "anytrace-graph-filter-prefs";
+const DEFAULT_GRAPH_PERSON_LIMIT = 40;
+const DEFAULT_EDGES_PER_PERSON = 2;
+
+type GraphPlatformFilter = "all" | "x" | "linkedin";
+
+function edgeTimeValue(edge: Pick<GraphEdge, "firstObservedAt">) {
+  const time = new Date(edge.firstObservedAt || 0).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
 
 function platformColor(platform: ActivityPlatform) {
   if (platform === "linkedin") return "hsl(var(--signal-linkedin))";
@@ -150,6 +159,10 @@ function platformColor(platform: ActivityPlatform) {
 
 function personConnectionLabel(person: TrackedPerson) {
   return personDisplayLabel(person);
+}
+
+function isManualLocalPerson(person: TrackedPerson) {
+  return person.id.startsWith("local-person");
 }
 
 function EmptyGraphState({
@@ -360,8 +373,8 @@ function GraphInner() {
   const [query, setQuery] = useState("");
   const [overviewQuery, setOverviewQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
-  const [platformFilter, setPlatformFilter] = useState<"all" | IdentityPlatform>("all");
-  const [xSnapshotMode, setXSnapshotMode] = useState<"all" | "new" | "multi" | "github">("multi");
+  const [platformFilter, setPlatformFilter] = useState<GraphPlatformFilter>("x");
+  const [xSnapshotMode, setXSnapshotMode] = useState<"all" | "new" | "multi">("multi");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [networkFocusOpen, setNetworkFocusOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -393,12 +406,13 @@ function GraphInner() {
   const selectedPersonEvents = selectedPerson
     ? (graph?.events ?? []).filter((event) => event.personId === selectedPerson.id).slice(0, 4)
     : [];
-  const selectedVcConnections = selectedVc
-    ? (graph?.edges ?? [])
-        .filter((edge) => edge.sourceId === selectedVc.id)
-        .map((edge) => graph?.people.find((person) => person.id === edge.targetId))
-        .filter((person): person is TrackedPerson => !!person)
-    : [];
+  const selectedVcConnections = useMemo(() => {
+    if (!selectedVc || !graph) return [];
+    return graph.edges
+      .filter((edge) => edge.sourceId === selectedVc.id)
+      .map((edge) => graph.people.find((person) => person.id === edge.targetId))
+      .filter((person): person is TrackedPerson => !!person);
+  }, [graph, selectedVc]);
   const vcsById = useMemo(() => new Map((graph?.vcs ?? []).map((vc) => [vc.id, vc])), [graph?.vcs]);
 
   useEffect(() => {
@@ -457,35 +471,96 @@ function GraphInner() {
       return [person.fullName, person.company, person.location].join(" ").toLowerCase().includes(search);
     });
     const personIds = new Set(baseFilteredPeople.map((person) => person.id));
-    const xEdges = graph.edges.filter((edge) => edge.platform === "x" && edge.graphSource === "snapshot");
+    const graphEdges = graph.edges.filter((edge) => edge.platform !== "github");
+    const xEdges = graphEdges.filter((edge) => edge.platform === "x" && edge.graphSource === "snapshot");
     const multiFollowedTargetIds = new Set(
       xEdges
         .filter((edge) => (edge.followerCount ?? 0) > 1)
         .map((edge) => edge.targetId),
     );
-    const isGithubLinkedXEdge = (edge: (typeof graph.edges)[number]) => edge.platform === "x" && edge.graphSource === "event";
-    const baseFilteredEdges = graph.edges.filter((edge) => {
-      if (!personIds.has(edge.targetId)) return false;
-      if (platformFilter === "all") return true;
-      return edge.platform === platformFilter;
-    }).filter((edge) => {
-      if (edge.platform !== "x") {
-        return true;
-      }
-      if (xSnapshotMode === "github") return isGithubLinkedXEdge(edge);
-      if (isGithubLinkedXEdge(edge)) return xSnapshotMode === "all";
-      if (edge.graphSource !== "snapshot") return true;
-      if (xSnapshotMode === "all") return true;
-      if (xSnapshotMode === "new") return edge.isRecent === true;
-      return multiFollowedTargetIds.has(edge.targetId);
+    const isEventDerivedXEdge = (edge: (typeof graph.edges)[number]) => edge.platform === "x" && edge.graphSource === "event";
+    const preFilteredEdges = graphEdges
+      .filter((edge) => {
+        if (!personIds.has(edge.targetId)) return false;
+        if (platformFilter === "all") return true;
+        return edge.platform === platformFilter;
+      })
+      .filter((edge) => {
+        if (edge.platform !== "x") {
+          return xSnapshotMode === "all";
+        }
+        if (isEventDerivedXEdge(edge)) return xSnapshotMode === "all";
+        if (edge.graphSource !== "snapshot") return true;
+        if (xSnapshotMode === "all") return true;
+        if (xSnapshotMode === "new") return edge.isRecent === true;
+        return multiFollowedTargetIds.has(edge.targetId);
+      });
+
+    const selectedPersonId =
+      focusPersonId ||
+      (selectedNodeId && graph.people.some((person) => person.id === selectedNodeId) ? selectedNodeId : null);
+    const selectedVcId =
+      focusVcId ||
+      (selectedNodeId && graph.vcs.some((vc) => vc.id === selectedNodeId) ? selectedNodeId : null);
+    const shouldLimitDefaultGraph = !search && !focusVcId && !focusPersonId && xSnapshotMode === "multi" && platformFilter === "x";
+    const graphPersonLimit = isMobile ? 18 : DEFAULT_GRAPH_PERSON_LIMIT;
+    const targetStats = new Map<string, { followerCount: number; latest: number; edgeCount: number }>();
+
+    preFilteredEdges.forEach((edge) => {
+      const stats = targetStats.get(edge.targetId) ?? { followerCount: 0, latest: 0, edgeCount: 0 };
+      stats.followerCount = Math.max(stats.followerCount, edge.followerCount ?? 0);
+      stats.latest = Math.max(stats.latest, edgeTimeValue(edge));
+      stats.edgeCount += 1;
+      targetStats.set(edge.targetId, stats);
     });
+
+    const visibleTargetIds = shouldLimitDefaultGraph
+      ? new Set(
+          [...targetStats.entries()]
+            .sort((left, right) => {
+              const followerDiff = right[1].followerCount - left[1].followerCount;
+              if (followerDiff !== 0) return followerDiff;
+              const latestDiff = right[1].latest - left[1].latest;
+              if (latestDiff !== 0) return latestDiff;
+              return right[1].edgeCount - left[1].edgeCount;
+            })
+            .slice(0, graphPersonLimit)
+            .map(([personId]) => personId),
+        )
+      : new Set(preFilteredEdges.map((edge) => edge.targetId));
+
+    if (selectedPersonId) {
+      visibleTargetIds.add(selectedPersonId);
+    }
+
+    if (selectedVcId && shouldLimitDefaultGraph) {
+      preFilteredEdges
+        .filter((edge) => edge.sourceId === selectedVcId)
+        .slice(0, graphPersonLimit)
+        .forEach((edge) => visibleTargetIds.add(edge.targetId));
+    }
+
+    let baseFilteredEdges = preFilteredEdges.filter((edge) => visibleTargetIds.has(edge.targetId));
+    if (shouldLimitDefaultGraph) {
+      const edgesByTarget = new Map<string, typeof baseFilteredEdges>();
+      baseFilteredEdges.forEach((edge) => {
+        const list = edgesByTarget.get(edge.targetId) ?? [];
+        list.push(edge);
+        edgesByTarget.set(edge.targetId, list);
+      });
+      baseFilteredEdges = [...edgesByTarget.values()].flatMap((targetEdges) =>
+        [...targetEdges]
+          .sort((left, right) => edgeTimeValue(left) - edgeTimeValue(right) || left.sourceId.localeCompare(right.sourceId))
+          .slice(0, DEFAULT_EDGES_PER_PERSON),
+      );
+    }
     const connectedPersonIds = new Set(baseFilteredEdges.map((edge) => edge.targetId));
     const connectedVcIds = new Set(baseFilteredEdges.map((edge) => edge.sourceId));
-    const hideDisconnectedSnapshotNodes = xSnapshotMode === "multi" || xSnapshotMode === "new" || xSnapshotMode === "github";
+    const hideDisconnectedSnapshotNodes = xSnapshotMode === "multi" || xSnapshotMode === "new";
     const filteredPeople =
       hideDisconnectedSnapshotNodes
         ? baseFilteredPeople.filter((person) => connectedPersonIds.has(person.id))
-        : baseFilteredPeople;
+        : baseFilteredPeople.filter((person) => connectedPersonIds.has(person.id) || isManualLocalPerson(person));
     const filteredEdges =
       hideDisconnectedSnapshotNodes
         ? baseFilteredEdges.filter(
@@ -494,7 +569,7 @@ function GraphInner() {
         : baseFilteredEdges;
     const vcIds = new Set(filteredEdges.map((edge) => edge.sourceId));
     const activeNodeId = selectedNodeId;
-    const visibleVcs = graph.vcs;
+    const visibleVcs = graph.vcs.filter((vc) => vcIds.has(vc.id));
     const siblingOrderByEdgeId = new Map<string, number>();
     const siblingCountBySource = new Map<string, number>();
     const edgesBySource = new Map<string, typeof filteredEdges>();
@@ -581,8 +656,8 @@ function GraphInner() {
         zIndex: edge.isTopPick ? 2 : 1,
         style: {
           stroke: platformColor(edge.platform),
-          strokeWidth: Math.min(4, Math.max(1.25, edge.eventCount * 1.3 + (siblingCount > 1 ? siblingIndex * 0.05 : 0))),
-          opacity: dimUnselectedEdges ? 0.12 : edge.isTopPick ? 0.95 : 0.56,
+          strokeWidth: Math.min(3, Math.max(1, edge.eventCount * 1.1 + (siblingCount > 1 ? siblingIndex * 0.04 : 0))),
+          opacity: dimUnselectedEdges ? 0.1 : edge.isTopPick ? 0.9 : shouldLimitDefaultGraph ? 0.34 : 0.54,
           pointerEvents: "none",
         },
         selectable: false,
@@ -592,39 +667,15 @@ function GraphInner() {
     });
 
     return { nodes: [...vcNodes, ...personNodes], edges };
-  }, [deferredQuery, graph, identitiesByPerson, platformFilter, positionOverrides, selectedNodeId, showOnlyTop, xSnapshotMode]);
+  }, [deferredQuery, focusPersonId, focusVcId, graph, identitiesByPerson, isMobile, platformFilter, positionOverrides, selectedNodeId, showOnlyTop, xSnapshotMode]);
 
   const overviewVisiblePersonIds = useMemo(() => {
-    if (!graph) return new Set<string>();
-
-    const xEdges = graph.edges.filter((edge) => edge.platform === "x" && edge.graphSource === "snapshot");
-    const multiFollowedTargetIds = new Set(
-      xEdges
-        .filter((edge) => (edge.followerCount ?? 0) > 1)
-        .map((edge) => edge.targetId),
+    return new Set(
+      built.nodes
+        .filter((node) => node.data.kind === "person")
+        .map((node) => node.id),
     );
-
-    const filteredEdges = graph.edges
-      .filter((edge) => {
-        if (platformFilter === "all") return true;
-        return edge.platform === platformFilter;
-      })
-      .filter((edge) => {
-        if (edge.platform !== "x") {
-          return true;
-        }
-        if (xSnapshotMode === "github") return edge.graphSource === "event";
-        if (edge.graphSource === "event") return xSnapshotMode === "all";
-        if (edge.graphSource !== "snapshot") {
-          return true;
-        }
-        if (xSnapshotMode === "all") return true;
-        if (xSnapshotMode === "new") return edge.isRecent === true;
-        return multiFollowedTargetIds.has(edge.targetId);
-      });
-
-    return new Set(filteredEdges.map((edge) => edge.targetId));
-  }, [graph, platformFilter, xSnapshotMode]);
+  }, [built.nodes]);
 
   const focusNode = useCallback(
     (nodeId: string) => {
@@ -681,6 +732,12 @@ function GraphInner() {
     setSearchParams(nextParams, { replace: true });
   }, [built.nodes, focusNode, focusPersonId, searchParams, setSearchParams]);
 
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    if (built.nodes.some((node) => node.id === selectedNodeId)) return;
+    setSelectedNodeId(null);
+  }, [built.nodes, selectedNodeId]);
+
   const overviewPeople = useMemo(() => {
     if (!graph) return [];
     const topPickIds = new Set(graph.weeklyPicks.map((pick) => pick.person.id));
@@ -723,8 +780,9 @@ function GraphInner() {
     };
   }, [built.edges.length, built.nodes]);
 
-  const hasEdges = (graph?.edges.length ?? 0) > 0;
-  const hasRenderableNodes = (graph?.vcs.length ?? 0) > 0 || (graph?.people.length ?? 0) > 0;
+  const graphIsLoading = graphQuery.isLoading || identitiesQuery.isLoading;
+  const hasRawGraphData = (graph?.edges ?? []).some((edge) => edge.platform !== "github");
+  const hasVisibleGraph = built.nodes.length > 0 && built.edges.length > 0;
   const usingEventConnections = graph?.graphSource === "event";
   const graphIsPartial = usingEventConnections || (graph?.filteredConnectionCount ?? 0) > 0;
   const selectedNodeLabel = selectedPerson?.fullName || selectedVc?.name || "Selected network";
@@ -772,17 +830,15 @@ function GraphInner() {
     [staticFocusNodes.length],
   );
   const activeFilterCount =
-    Number(showOnlyTop) + Number(platformFilter !== "all") + Number(xSnapshotMode !== "all");
+    Number(showOnlyTop) + Number(platformFilter !== "x") + Number(xSnapshotMode !== "multi");
   const activeFilterSummary = [
     showOnlyTop ? "Top picks" : null,
-    platformFilter !== "all" ? `Platform: ${platformFilter}` : null,
-    xSnapshotMode !== "all"
-      ? xSnapshotMode === "new"
+    platformFilter !== "x" ? (platformFilter === "all" ? "All non-GitHub context" : `Platform: ${platformFilter}`) : null,
+    xSnapshotMode === "all"
+      ? "Full X snapshot"
+      : xSnapshotMode === "new"
         ? "New X only"
-        : xSnapshotMode === "github"
-          ? "GitHub-linked X"
-        : "Multi-followed only"
-      : null,
+        : "Qualified seed-follows",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -790,7 +846,7 @@ function GraphInner() {
   return (
     <ProductGate
       title="Graph"
-      description="Live VC-to-candidate connections from Supabase and TweetAPI-backed follow snapshots."
+      description="Local VC graph based on the current seed dataset and your local workspace additions."
     >
       <div className="relative h-[calc(100vh-7rem)] overflow-hidden bg-surface-sunken/40 sm:h-[calc(100vh-6.5rem)] md:h-[calc(100vh-4rem)]">
         <div className="absolute top-3 left-3 right-3 z-10 flex flex-col gap-3 pointer-events-none md:top-4 md:left-4 md:right-4">
@@ -887,8 +943,8 @@ function GraphInner() {
                   className="rounded-full text-xs text-muted-foreground"
                   onClick={() => {
                     setShowOnlyTop(false);
-                    setPlatformFilter("all");
-                    setXSnapshotMode("all");
+                    setPlatformFilter("x");
+                    setXSnapshotMode("multi");
                   }}
                 >
                   Reset
@@ -903,31 +959,29 @@ function GraphInner() {
                     type="single"
                     value={platformFilter}
                     onValueChange={(value) => {
-                      if (value) setPlatformFilter(value as "all" | IdentityPlatform);
+                      if (value) setPlatformFilter(value as GraphPlatformFilter);
                     }}
                     className="mt-3 flex flex-wrap justify-start gap-2"
                   >
-                    <ToggleGroupItem value="all" variant="outline" size="sm" className="rounded-full">All</ToggleGroupItem>
                     <ToggleGroupItem value="x" variant="outline" size="sm" className="rounded-full">X</ToggleGroupItem>
-                    <ToggleGroupItem value="github" variant="outline" size="sm" className="rounded-full">GitHub</ToggleGroupItem>
+                    <ToggleGroupItem value="all" variant="outline" size="sm" className="rounded-full">All context</ToggleGroupItem>
                     <ToggleGroupItem value="linkedin" variant="outline" size="sm" className="rounded-full">LinkedIn</ToggleGroupItem>
                   </ToggleGroup>
                 </div>
 
                 <div className="rounded-[18px] border border-border/70 p-3">
                   <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">X connections</div>
-                  <div className="mt-1 text-sm text-foreground">Switch between tracked X follows and GitHub-linked X signals.</div>
+                  <div className="mt-1 text-sm text-foreground">Switch between qualified multi-follows and broader X snapshots.</div>
                   <ToggleGroup
                     type="single"
                     value={xSnapshotMode}
                     onValueChange={(value) => {
-                      if (value) setXSnapshotMode(value as "all" | "new" | "multi" | "github");
+                      if (value) setXSnapshotMode(value as "all" | "new" | "multi");
                     }}
                     className="mt-3 flex flex-wrap justify-start gap-2"
                   >
                     <ToggleGroupItem value="multi" variant="outline" size="sm" className="rounded-full">Multi-followed</ToggleGroupItem>
                     <ToggleGroupItem value="new" variant="outline" size="sm" className="rounded-full">New only</ToggleGroupItem>
-                    <ToggleGroupItem value="github" variant="outline" size="sm" className="rounded-full">GitHub-linked X</ToggleGroupItem>
                     <ToggleGroupItem value="all" variant="outline" size="sm" className="rounded-full">Full snapshot</ToggleGroupItem>
                   </ToggleGroup>
                 </div>
@@ -955,7 +1009,7 @@ function GraphInner() {
           )}
         </div>
 
-        {!graphQuery.isLoading && hasRenderableNodes && !isMobile && (
+        {!graphIsLoading && hasVisibleGraph && !isMobile && (
           <div
             className={`absolute left-3 top-16 bottom-3 z-10 pointer-events-auto transition-all duration-300 md:left-4 md:top-20 md:bottom-4 ${
               sidebarOpen ? "w-[320px]" : "w-12"
@@ -1040,7 +1094,7 @@ function GraphInner() {
           </div>
         )}
 
-        {graphQuery.isLoading || identitiesQuery.isLoading ? (
+        {graphIsLoading ? (
           <div className="absolute inset-0 grid place-items-center">
             <Skeleton className="h-56 w-80 rounded-[28px]" />
           </div>
@@ -1049,10 +1103,15 @@ function GraphInner() {
             title="Could not load the graph"
             body="The graph data is unavailable."
           />
-        ) : !hasRenderableNodes ? (
+        ) : !hasRawGraphData ? (
           <EmptyGraphState
             title="No graph connections yet"
-            body="The graph is wired up, but there are no readable VC-to-candidate connections in Supabase yet."
+              body="The local dataset currently has no connection edges yet. You can still manage investors and tracked people in the local workspace."
+          />
+        ) : !hasVisibleGraph ? (
+          <EmptyGraphState
+            title="No visible connections for these filters"
+            body="Try the default X seed-follow view or clear your search. The backend has graph data, but the current filters hide every visible connection."
           />
         ) : (
           <ReactFlow
@@ -1280,7 +1339,7 @@ function GraphInner() {
           </DialogContent>
         </Dialog>
 
-        {!graphQuery.isLoading && (
+        {!graphIsLoading && graph && (
           <div className="absolute bottom-3 right-3 z-10 md:bottom-4 md:right-4">
             {statsOpen ? (
               <div className="w-[300px] max-w-[calc(100vw-1.5rem)] rounded-[24px] border border-border bg-background p-4 shadow-xl">
@@ -1310,7 +1369,7 @@ function GraphInner() {
                 </div>
 
                 <div className="mt-4 space-y-2">
-                  {!hasEdges && (
+                  {!hasVisibleGraph && (
                     <div className="rounded-2xl bg-surface-sunken px-3 py-2 text-xs text-muted-foreground">
                       No active VC-to-candidate edges are visible for the current filters.
                     </div>
@@ -1340,7 +1399,7 @@ function GraphInner() {
           </div>
         )}
 
-        {!graphQuery.isLoading && (selectedPerson || selectedVc) && (
+        {!graphIsLoading && (selectedPerson || selectedVc) && (
           <div className="absolute bottom-14 left-3 right-3 z-10 max-h-[46vh] overflow-y-auto rounded-[28px] border border-border bg-background p-4 shadow-xl md:bottom-4 md:left-auto md:right-4 md:w-[340px] md:max-w-[calc(100vw-2rem)] md:p-5">
             {graphIsPartial && (
               <div className="mb-4 rounded-2xl bg-surface-sunken px-3 py-2 text-[11px] text-muted-foreground">

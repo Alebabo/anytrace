@@ -6,7 +6,9 @@ import {
   Menu,
   Network,
   Activity,
+  Bell,
   Users,
+  Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -22,10 +24,11 @@ type NavItem = {
 };
 
 const nav: NavItem[] = [
-  { to: "/", label: "Main", icon: LayoutDashboard },
+  { to: "/", label: "Inbox", icon: Bell },
   { to: "/graph", label: "Graph", icon: Network },
-  { to: "/activities", label: "Activities", icon: Activity },
+  { to: "/activities", label: "Alert Log", icon: Activity },
   { to: "/watchlist", label: "Watchlist", icon: Users },
+  { to: "/top-picks", label: "Top Picks", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -126,7 +129,7 @@ export default function AppLayout() {
             {!sidebarCollapsed ? (
               <div className="rounded-2xl border border-sidebar-border bg-background/70 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.22em] text-sidebar-foreground/60">Status</div>
-                <div className="mt-2 text-sm text-sidebar-foreground">TweetAPI live, graph synced, scans ready.</div>
+                <div className="mt-2 text-sm text-sidebar-foreground">Alert inbox active, backend data loaded.</div>
               </div>
             ) : (
               <div className="flex justify-center">

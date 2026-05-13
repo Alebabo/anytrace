@@ -1,17 +1,12 @@
-import { DatabaseZap, Github, Layers3, Loader2, RefreshCcw, ShieldOff, Sparkles, Trash2, Twitter } from "lucide-react";
-import {
-  useGithubScanEndpoint,
-  useRefreshAnytraceData,
-  useResetActivities,
-  useRunFullPipeline,
-  useRunGithubScan,
-  useRunIdentityMatch,
-  useRunTwitterScrape,
-  useTwitterScrapeEndpoint,
-} from "@/hooks/useAnytrace";
+import { useEffect, useState } from "react";
+import { BellRing, DatabaseZap, Layers3, RefreshCcw, Save, ShieldOff, Trash2 } from "lucide-react";
+import { useAppSettings, useRefreshAnytraceData, useResetActivities, useUpdateAppSettings } from "@/hooks/useAnytrace";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 function InfoRow({
   icon: Icon,
@@ -34,16 +29,23 @@ function InfoRow({
 }
 
 export default function SettingsPage() {
-  const runTwitterScrape = useRunTwitterScrape();
-  const runGithubScan = useRunGithubScan();
-  const runIdentityMatch = useRunIdentityMatch();
-  const runFullPipeline = useRunFullPipeline();
+  const appSettings = useAppSettings();
+  const updateAppSettings = useUpdateAppSettings();
   const resetActivities = useResetActivities();
   const refreshAnytraceData = useRefreshAnytraceData();
-  const twitterScrapeEndpoint = useTwitterScrapeEndpoint();
-  const githubScanEndpoint = useGithubScanEndpoint();
-  const lastRun = runTwitterScrape.data;
-  const lastGithubRun = runGithubScan.data;
+  const [thresholdDraft, setThresholdDraft] = useState(2);
+
+  useEffect(() => {
+    if (appSettings.data?.seedFollowAlertThreshold) {
+      setThresholdDraft(appSettings.data.seedFollowAlertThreshold);
+    }
+  }, [appSettings.data?.seedFollowAlertThreshold]);
+
+  const savedThreshold = appSettings.data?.seedFollowAlertThreshold ?? 2;
+  const hasThresholdChanges = thresholdDraft !== savedThreshold;
+  const saveThreshold = () => {
+    updateAppSettings.mutate({ seedFollowAlertThreshold: thresholdDraft });
+  };
 
   return (
     <ProductGate title="Settings">
@@ -51,68 +53,108 @@ export default function SettingsPage() {
         <div className="mb-10">
           <h2 className="font-serif text-5xl leading-[1.05]">Settings</h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Hier kannst du den aktuellen Projektzustand sehen und X- sowie GitHub-Scans aus dem Frontend anstoßen.
+            Dieses Projekt lädt Daten bevorzugt aus dem lokalen Backend und nutzt Seed-Daten nur als Fallback, wenn das Backend kurz nicht erreichbar ist.
           </p>
         </div>
 
         <div className="grid gap-4">
           <Card className="rounded-[28px] border-border p-6 shadow-none">
+            <div className="flex flex-col gap-5">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                  <BellRing className="h-3.5 w-3.5" />
+                  Alert logic
+                </div>
+                <h3 className="text-base font-medium">Seed-follow threshold</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  Neue Alerts entstehen, sobald eine entdeckte Person von mindestens dieser Anzahl kuratierter Seed-Accounts gefolgt wird. Bestehende Alerts bleiben als Historie erhalten.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-surface-sunken/30 p-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <Label htmlFor="seed-follow-threshold">Minimum seed followers</Label>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      Aktuell gespeichert: {savedThreshold} Seed-Accounts. Empfehlung fuer V1: 2.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="seed-follow-threshold"
+                      type="number"
+                      min={2}
+                      max={10}
+                      value={thresholdDraft}
+                      onChange={(event) => {
+                        const nextValue = Number(event.target.value);
+                        if (Number.isFinite(nextValue)) {
+                          setThresholdDraft(Math.max(2, Math.min(10, nextValue)));
+                        }
+                      }}
+                      className="w-24 rounded-xl text-center text-lg font-medium"
+                    />
+                    <span className="text-sm text-muted-foreground">Seeds</span>
+                  </div>
+                </div>
+
+                <Slider
+                  value={[thresholdDraft]}
+                  min={2}
+                  max={10}
+                  step={1}
+                  onValueChange={(value) => setThresholdDraft(value[0] ?? 2)}
+                  className="mt-5"
+                />
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Niedriger = mehr Discovery, hoeher = weniger Rauschen.
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={saveThreshold}
+                    disabled={!hasThresholdChanges || updateAppSettings.isPending}
+                    className="rounded-full"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save threshold
+                  </Button>
+                </div>
+
+                {updateAppSettings.isError ? (
+                  <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    {(updateAppSettings.error as Error)?.message || "Der Threshold konnte nicht gespeichert werden."}
+                  </div>
+                ) : null}
+
+                {updateAppSettings.data ? (
+                  <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                    Threshold gespeichert. {updateAppSettings.data.backfillStats?.alertsCreated ?? 0} zusaetzliche Alerts aus vorhandenen Beobachtungen erzeugt.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="rounded-[28px] border-border p-6 shadow-none">
             <h3 className="mb-4 text-base font-medium">Current state</h3>
-            <InfoRow icon={DatabaseZap} label="Backend" value="Local Anytrace API or custom endpoint" />
-            <InfoRow icon={ShieldOff} label="Access" value="Direct local mode" />
-            <InfoRow icon={Trash2} label="Fallback data" value="Entfernt" />
-            <InfoRow icon={Layers3} label="Frontend mode" value="Supabase + local scan triggers" />
+            <InfoRow icon={DatabaseZap} label="Storage" value="Backend snapshot + local browser overlays" />
+            <InfoRow icon={ShieldOff} label="Auth" value="Local access only" />
+            <InfoRow icon={Layers3} label="Frontend mode" value="Backend-first with seed fallback" />
+            <InfoRow icon={Trash2} label="Reset action" value="Deletes local additions, then refetches the latest data" />
           </Card>
 
           <Card className="rounded-[28px] border-border p-6 shadow-none">
             <div className="flex flex-col gap-3">
               <div>
-                <h3 className="text-base font-medium">Backend controls</h3>
+                <h3 className="text-base font-medium">Local workspace controls</h3>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  Sobald `python -m backend.main serve-api` laeuft, kannst du hier alles direkt im Frontend ausloesen und die Daten danach sofort neu laden.
+                  `Reload data` fragt das Backend erneut ab und aktualisiert danach die lokale Ansicht. `Reset local workspace` löscht nur manuelle Browser-Ergänzungen und lädt anschließend den aktuellen Datenstand neu.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  onClick={() => runFullPipeline.mutate()}
-                  disabled={runFullPipeline.isPending}
-                  className="rounded-full"
-                >
-                  {runFullPipeline.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Run full pipeline
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => runIdentityMatch.mutate()}
-                  disabled={runIdentityMatch.isPending}
-                  className="rounded-full"
-                >
-                  {runIdentityMatch.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Matching...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Run identity match
-                    </>
-                  )}
-                </Button>
-
                 <Button
                   type="button"
                   variant="outline"
@@ -120,17 +162,8 @@ export default function SettingsPage() {
                   disabled={refreshAnytraceData.isPending}
                   className="rounded-full"
                 >
-                  {refreshAnytraceData.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Reloading...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCcw className="h-4 w-4" />
-                      Reload data
-                    </>
-                  )}
+                  <RefreshCcw className="h-4 w-4" />
+                  Reload data
                 </Button>
 
                 <Button
@@ -140,31 +173,10 @@ export default function SettingsPage() {
                   disabled={resetActivities.isPending}
                   className="rounded-full"
                 >
-                  {resetActivities.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Resetting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="h-4 w-4" />
-                      Reset activities
-                    </>
-                  )}
+                  <Trash2 className="h-4 w-4" />
+                  Reset local workspace
                 </Button>
               </div>
-
-              {runFullPipeline.isError && (
-                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                  {(runFullPipeline.error as Error)?.message || "Die Pipeline konnte nicht gestartet werden."}
-                </div>
-              )}
-
-              {runIdentityMatch.isError && (
-                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                  {(runIdentityMatch.error as Error)?.message || "Der Identity-Match-Run konnte nicht gestartet werden."}
-                </div>
-              )}
 
               {refreshAnytraceData.isError && (
                 <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -174,19 +186,7 @@ export default function SettingsPage() {
 
               {resetActivities.isError && (
                 <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                  {(resetActivities.error as Error)?.message || "Activities konnten nicht zurueckgesetzt werden."}
-                </div>
-              )}
-
-              {runIdentityMatch.data && (
-                <div className="rounded-2xl border border-border bg-surface-sunken/40 px-4 py-3 text-sm text-muted-foreground">
-                  {runIdentityMatch.data.count ?? 0} Identity-Matches verarbeitet.
-                </div>
-              )}
-
-              {runFullPipeline.data && (
-                <div className="rounded-2xl border border-border bg-surface-sunken/40 px-4 py-3 text-sm text-muted-foreground">
-                  Pipeline status: {runFullPipeline.data.status || "completed"}
+                  {(resetActivities.error as Error)?.message || "Der lokale Workspace konnte nicht zurückgesetzt werden."}
                 </div>
               )}
 
@@ -196,135 +196,6 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
-          </Card>
-
-          <Card className="rounded-[28px] border-border p-6 shadow-none">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-2xl">
-                <h3 className="text-base font-medium">Manual X scan</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Startet deinen X API Scan per Button. Standardmaessig wird dein lokales Backend unter `http://127.0.0.1:8766/run-twitter` verwendet.
-                </p>
-                <p className="mt-2 break-all text-xs text-muted-foreground">
-                  Endpoint: {twitterScrapeEndpoint || "nicht konfiguriert"}
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={() => runTwitterScrape.mutate()}
-                disabled={runTwitterScrape.isPending}
-                className="rounded-full"
-              >
-                {runTwitterScrape.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Twitter className="h-4 w-4" />
-                    Run X scan
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-border bg-surface-sunken/40 px-4 py-3 text-sm text-muted-foreground">
-              Starte dafuer lokal `python -m backend.main serve-api`. Optional kannst du mit `VITE_ANYTRACE_BACKEND_URL` oder `VITE_TWITTER_SCRAPE_URL` einen anderen Endpoint ueberschreiben.
-            </div>
-
-            {runTwitterScrape.isError && (
-              <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                {(runTwitterScrape.error as Error)?.message || "Der X-Scan konnte nicht gestartet werden."}
-              </div>
-            )}
-
-            {lastRun && (
-              <div className="mt-4 rounded-2xl border border-border bg-surface-sunken/40 px-4 py-4">
-                <div className="text-sm font-medium">
-                  {lastRun.count} VC{lastRun.count === 1 ? "" : "s"} processed
-                </div>
-                <div className="mt-3 grid gap-3">
-                  {lastRun.results?.map((result) => (
-                    <div key={result.vc_name} className="rounded-2xl bg-background px-4 py-3 text-sm">
-                      <div className="font-medium">{result.vc_name}</div>
-                      <div className="mt-1 text-muted-foreground">
-                        {result.new_snapshot_count} neue Handles / {result.matched_candidate_count} Candidate-Matches / {result.stopped_early ? "Early stop" : "Full pass"}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {result.baseline_run ? "Baseline run" : "Incremental run"} / {result.output_file}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card className="rounded-[28px] border-border p-6 shadow-none">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-2xl">
-                <h3 className="text-base font-medium">Manual GitHub scan</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Startet deinen GitHub API Scan per Button. Standardmaessig wird dein lokales Backend unter `http://127.0.0.1:8766/run-github` verwendet.
-                </p>
-                <p className="mt-2 break-all text-xs text-muted-foreground">
-                  Endpoint: {githubScanEndpoint || "nicht konfiguriert"}
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={() => runGithubScan.mutate()}
-                disabled={runGithubScan.isPending}
-                className="rounded-full"
-              >
-                {runGithubScan.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Github className="h-4 w-4" />
-                    Run GitHub scan
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-border bg-surface-sunken/40 px-4 py-3 text-sm text-muted-foreground">
-              Starte dafuer lokal `python -m backend.main serve-api`. Optional kannst du mit `VITE_ANYTRACE_BACKEND_URL` oder `VITE_GITHUB_SCAN_URL` einen anderen Endpoint ueberschreiben.
-            </div>
-
-            {runGithubScan.isError && (
-              <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                {(runGithubScan.error as Error)?.message || "Der GitHub-Scan konnte nicht gestartet werden."}
-              </div>
-            )}
-
-            {lastGithubRun && (
-              <div className="mt-4 rounded-2xl border border-border bg-surface-sunken/40 px-4 py-4">
-                <div className="text-sm font-medium">
-                  {lastGithubRun.scanned_people ?? lastGithubRun.count ?? 0} people scanned
-                  {typeof lastGithubRun.scanned_repos === "number" ? ` / ${lastGithubRun.scanned_repos} repos` : ""}
-                  {typeof lastGithubRun.viral_repo_count === "number" ? ` / ${lastGithubRun.viral_repo_count} viral repos` : ""}
-                </div>
-                {lastGithubRun.results?.length ? (
-                  <div className="mt-3 grid gap-3">
-                    {lastGithubRun.results.map((result, index) => (
-                      <div key={`${result.person_name || result.repo || "github"}-${index}`} className="rounded-2xl bg-background px-4 py-3 text-sm">
-                        <div className="font-medium">{result.person_name || result.repo || "GitHub result"}</div>
-                        <div className="mt-1 text-muted-foreground">
-                          {result.status || "ok"}
-                          {typeof result.stars === "number" ? ` / ${result.stars} stars` : ""}
-                          {typeof result.star_delta_7d === "number" ? ` / ${result.star_delta_7d} 7d delta` : ""}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            )}
           </Card>
         </div>
       </div>

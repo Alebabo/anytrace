@@ -10,7 +10,8 @@ export type EventType =
   | "mention"
   | "important_github_follower"
   | "linkedin_interaction";
-export type VcTier = "angel" | "microvc" | "vc";
+export type VcTier = "angel" | "microvc" | "vc" | "journalist";
+export type VcAccountType = "firm" | "partner" | "analyst" | "scout" | "brand" | "journalist" | "other";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
 export type WeeklyReasonKind =
   | "vc_follow_burst"
@@ -18,6 +19,10 @@ export type WeeklyReasonKind =
   | "big_tech_exit"
   | "important_github_followers";
 export type SyncStatus = "idle" | "pending" | "ok" | "error";
+
+export interface AnytraceAppSettings {
+  seedFollowAlertThreshold: number;
+}
 
 export interface ViewerAccessState {
   isAuthenticated: boolean;
@@ -46,6 +51,10 @@ export interface VcSource {
   linkedinUrl?: string | null;
   githubUsername?: string | null;
   websiteUrl?: string | null;
+  clusterId?: string | null;
+  clusterName?: string | null;
+  accountType?: VcAccountType | null;
+  isPrimaryClusterAccount?: boolean;
   notes: string;
   isSeeded: boolean;
   createdByUserId?: string | null;
@@ -78,6 +87,7 @@ export interface VcSourceDraft {
   xHandle?: string;
   githubUsername?: string;
   websiteUrl?: string;
+  accountType?: VcAccountType;
   notes?: string;
 }
 
@@ -169,6 +179,50 @@ export interface WeeklyPick {
   person: TrackedPerson;
   reasons: WeeklyPickReason[];
   githubProfile?: GithubSignalProfile | null;
+}
+
+export interface SeedFollowerAccount {
+  id: string;
+  name: string;
+  xHandle?: string | null;
+  accountType?: VcAccountType | string | null;
+  tier?: number | string | null;
+  profileUrl?: string | null;
+  firstSeenAt?: string | null;
+  lastSeenAt?: string | null;
+}
+
+export interface SeedFollowAlert {
+  id: string;
+  personId: string;
+  displayName: string;
+  xHandle?: string | null;
+  primaryProfileUrl: string;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
+  linkedinHeadline?: string | null;
+  linkedinRoleTitle?: string | null;
+  linkedinCompany?: string | null;
+  linkedinLocation?: string | null;
+  linkedinEnrichedAt?: string | null;
+  triggeredAt: string;
+  alertThreshold?: number | null;
+  triggeringSeedAccounts: SeedFollowerAccount[];
+  seedFollowers: SeedFollowerAccount[];
+  currentSeedFollowerCount: number;
+  status: "new" | "seen" | "archived" | string;
+  promotedVcId?: string | null;
+  promotedAt?: string | null;
+}
+
+export interface SeedFollowPromotionDraft {
+  alertId: string;
+  name: string;
+  xHandle: string;
+  linkedinUrl: string;
+  clusterName: string;
+  accountType: VcAccountType;
+  tier: VcTier;
 }
 
 export interface WatchlistPerson extends TrackedPerson {

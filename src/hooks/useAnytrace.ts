@@ -2,9 +2,12 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ActivityEvent,
+  AnytraceAppSettings,
   GithubSignalProfile,
   GraphData,
   PersonIdentity,
+  SeedFollowAlert,
+  SeedFollowPromotionDraft,
   TrackedPerson,
   UserVcWatchlistItem,
   VcSource,
@@ -15,24 +18,31 @@ import type {
   WeeklyPick,
 } from "@/data/anytrace";
 import {
+  addLocalTrackedPerson,
+  addLocalVc,
   clearSignalCaches,
   fetchActivityEvents,
+  fetchAppSettings,
   fetchGithubSignalProfiles,
   fetchGraphData,
   fetchPersonIdentities,
-  fetchTrackedGitPeople,
+  fetchSeedFollowAlerts,
+  fetchTrackedPeople,
   fetchVcSources,
   fetchWeeklyPicks,
-  hasFrontendSupabaseConfig,
-} from "@/lib/supabaseRest";
+  removeLocalTrackedPerson,
+  removeLocalVc,
+  resetLocalWorkspace,
+  shouldRetryBackendSnapshot,
+} from "@/lib/localData";
 import {
   getAuthState,
   sendMagicLink,
   signInAsLocalTestUser,
-  signOutSupabase,
+  signOutLocal,
   subscribeAuth,
   type AuthSession,
-} from "@/lib/supabaseAuth";
+} from "@/lib/localSession";
 
 type LocalSession = AuthSession["user"];
 
@@ -41,79 +51,29 @@ const EMPTY_WATCHLIST: WatchlistData = {
   people: [],
 };
 
-const EMPTY_GRAPH: GraphData = {
-  vcs: [],
-  people: [],
-  events: [],
-  weeklyPicks: [],
-  edges: [],
-  graphSource: "empty",
-  filteredConnectionCount: 0,
-};
-
 function useStaticMutation<TInput = void, TOutput = void>(handler: (input: TInput) => Promise<TOutput>) {
   return useMutation({
     mutationFn: handler,
   });
 }
 
-function getTwitterScrapeEndpoint() {
-  const explicitUrl = import.meta.env.VITE_TWITTER_SCRAPE_URL?.trim();
-  const baseUrl = getBackendBaseUrl();
-  return explicitUrl || `${baseUrl}/run-twitter`;
-}
-
-function getGithubScanEndpoint() {
-  const explicitUrl = import.meta.env.VITE_GITHUB_SCAN_URL?.trim();
-  const baseUrl = getBackendBaseUrl();
-  return explicitUrl || `${baseUrl}/run-github`;
-}
-
-function getActivitiesResetEndpoint() {
-  return `${getBackendBaseUrl()}/reset-activities`;
-}
-
-function getIdentityMatchEndpoint() {
-  return `${getBackendBaseUrl()}/run-identity-match`;
-}
-
-function getPipelineEndpoint() {
-  return `${getBackendBaseUrl()}/run-pipeline`;
+function anytraceQueryOptions() {
+  return {
+    staleTime: 30_000,
+    refetchOnMount: "always" as const,
+    refetchOnWindowFocus: true,
+    refetchInterval: () => (shouldRetryBackendSnapshot() ? 5_000 : false),
+  };
 }
 
 function getBackendBaseUrl() {
   return import.meta.env.VITE_ANYTRACE_BACKEND_URL?.trim() || "http://127.0.0.1:8766";
 }
 
-function getMissingFrontendConfigError(enabled: boolean) {
-  return enabled && !hasFrontendSupabaseConfig()
-    ? new Error("Frontend Supabase config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.")
-    : null;
-}
-
-function withFrontendConfigState<TData>(
-  query: {
-    data: TData | undefined;
-    isError: boolean;
-    error: unknown;
-  },
-  enabled: boolean,
-  fallbackData: TData,
-) {
-  const configError = getMissingFrontendConfigError(enabled);
-
-  return {
-    ...query,
-    data: (query.data ?? fallbackData) as TData,
-    isError: query.isError || !!configError,
-    error: query.error ?? configError,
-  };
-}
-
 function mapVcsToWatchlistItems(vcs: VcSource[]): UserVcWatchlistItem[] {
   return vcs.map((vc) => ({
     id: `watchlist-${vc.id}`,
-    userId: getAuthState().session?.user.id || "anonymous",
+    userId: getAuthState().session?.user.id || "local-anytrace-user",
     vcSourceId: vc.id,
     createdAt: vc.lastXSyncAt || new Date(0).toISOString(),
     vcSource: vc,
@@ -161,9 +121,7 @@ export function useMagicLinkSignIn() {
 }
 
 export function useEnableDemoMode() {
-  return useStaticMutation(async () => {
-    throw new Error("Demo mode and seeded data were removed.");
-  });
+  return useStaticMutation(async () => undefined);
 }
 
 export function useLoginAsAle() {
@@ -174,13 +132,13 @@ export function useLoginAsAle() {
 
 export function useSignOut() {
   return useStaticMutation(async () => {
-    await signOutSupabase();
+    await signOutLocal();
   });
 }
 
 export function useManualSync() {
   return useStaticMutation(async () => {
-    throw new Error("Manual sync was removed with the backend.");
+    throw new Error("External sync is currently disabled. The app is running in local-only mode.");
   });
 }
 
@@ -188,31 +146,20 @@ export function useRunTwitterScrape() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async () => {
-    const endpoint = getTwitterScrapeEndpoint();
-
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${getBackendBaseUrl()}/run-twitter`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
     });
-
-    const payload = (await response.json()) as {
-      ok: boolean;
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
       error?: string;
       count?: number;
-      results?: Array<{
-        vc_name: string;
-        baseline_run: boolean;
-        new_snapshot_count: number;
-        matched_candidate_count: number;
-        stopped_early: boolean;
-        output_file: string;
-      }>;
     };
 
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || "Twitter scrape could not be started. Start the local API with `python -m backend.main serve-api`.");
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Seed-follow scan could not be started. Start the local API with `python -m backend.main serve-api`.");
     }
 
     clearSignalCaches();
@@ -223,111 +170,65 @@ export function useRunTwitterScrape() {
 }
 
 export function useTwitterScrapeEndpoint() {
-  return getTwitterScrapeEndpoint();
+  return `${getBackendBaseUrl()}/run-twitter`;
 }
 
-export function useRunGithubScan() {
+export function useRunLinkedInMakeEnrichment() {
   const queryClient = useQueryClient();
 
-  return useStaticMutation(async () => {
-    const endpoint = getGithubScanEndpoint();
-    const response = await fetch(endpoint, {
+  return useStaticMutation(async (input?: { limit?: number; missingOnly?: boolean }) => {
+    const response = await fetch(`${getBackendBaseUrl()}/run-linkedin-make`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        limit: input?.limit ?? 25,
+        missingOnly: input?.missingOnly ?? true,
+      }),
     });
-
     const payload = (await response.json().catch(() => ({}))) as {
       ok?: boolean;
       error?: string;
-      count?: number;
-      scanned_people?: number;
-      scanned_repos?: number;
-      viral_repo_count?: number;
-      results?: Array<{
-        person_name?: string;
-        repo?: string;
-        status?: string;
-        stars?: number;
-        star_delta_7d?: number;
-      }>;
+      sent?: number;
+      status?: string;
+      message?: string;
     };
 
     if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || "GitHub scan could not be started. Start the local API with `python -m backend.main serve-api`.");
+      throw new Error(payload.error || "LinkedIn Make enrichment could not be started. Check MAKE_LINKEDIN_WEBHOOK_URL.");
     }
 
     clearSignalCaches();
     await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
     await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
     return payload;
+  });
+}
+
+export function useLinkedInMakeEndpoint() {
+  return `${getBackendBaseUrl()}/run-linkedin-make`;
+}
+
+export function useRunGithubScan() {
+  return useStaticMutation(async () => {
+    throw new Error("GitHub scanning is disabled in local-only mode.");
   });
 }
 
 export function useGithubScanEndpoint() {
-  return getGithubScanEndpoint();
+  return "Local-only mode";
 }
 
 export function useRunIdentityMatch() {
-  const queryClient = useQueryClient();
-
   return useStaticMutation(async () => {
-    const response = await fetch(getIdentityMatchEndpoint(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-      count?: number;
-      results?: Array<{
-        tracked_person_id?: string;
-        candidate_id?: string;
-        confidence?: number;
-        status?: string;
-      }>;
-    };
-
-    if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || "Identity match could not be started. Start the local API with `python -m backend.main serve-api`.");
-    }
-
-    clearSignalCaches();
-    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
-    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
-    return payload;
+    throw new Error("Identity matching is disabled in local-only mode.");
   });
 }
 
 export function useRunFullPipeline() {
-  const queryClient = useQueryClient();
-
   return useStaticMutation(async () => {
-    const response = await fetch(getPipelineEndpoint(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-      status?: string;
-    };
-
-    if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || "Full pipeline could not be started. Start the local API with `python -m backend.main serve-api`.");
-    }
-
-    clearSignalCaches();
-    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
-    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
-    return payload;
+    throw new Error("The remote pipeline is disabled. This workspace is using local seed data only.");
   });
 }
 
@@ -335,26 +236,13 @@ export function useResetActivities() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async () => {
-    const response = await fetch(getActivitiesResetEndpoint(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-      message?: string;
-    };
-
-    if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || "Activities could not be reset. Start the local API with `python -m backend.main serve-api`.");
-    }
-
+    resetLocalWorkspace();
     clearSignalCaches();
     await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
-    return payload;
+    return {
+      ok: true,
+      message: "Local workspace reset. Seed data was reloaded and custom local entries were deleted.",
+    };
   });
 }
 
@@ -368,15 +256,58 @@ export function useRefreshAnytraceData() {
   });
 }
 
+export function useAppSettings(_enabled = true) {
+  return useQuery({
+    queryKey: ["anytrace", "app-settings"],
+    queryFn: fetchAppSettings,
+    enabled: _enabled,
+    ...anytraceQueryOptions(),
+  });
+}
+
+export function useUpdateAppSettings() {
+  const queryClient = useQueryClient();
+
+  return useStaticMutation(async (input: Partial<AnytraceAppSettings>) => {
+    const threshold = input.seedFollowAlertThreshold;
+    if (!Number.isFinite(threshold)) {
+      throw new Error("Please enter a valid threshold.");
+    }
+
+    const response = await fetch(`${getBackendBaseUrl()}/settings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        seedFollowAlertThreshold: threshold,
+      }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      appSettings?: AnytraceAppSettings;
+      backfillStats?: { alertsCreated?: number };
+    };
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Settings could not be saved. Is the local backend running?");
+    }
+
+    clearSignalCaches();
+    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
+    return payload;
+  });
+}
+
 export function useVcSources(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "vcs"],
     queryFn: fetchVcSources,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
-
-  return withFrontendConfigState(query, _enabled, [] as VcSource[]);
 }
 
 export function useSelectedVcWatchlist(_enabled = true) {
@@ -397,69 +328,94 @@ export function useAddVcToWatchlist() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async (draft: VcSourceDraft) => {
-    const response = await fetch(`${getBackendBaseUrl()}/watchlist/add-vc`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    let vc: unknown = null;
+    let backendUnavailable = false;
+
+    try {
+      const response = await fetch(`${getBackendBaseUrl()}/watchlist/add-vc`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: draft.name,
+          xHandle: draft.xHandle || draft.twitterUrl,
+          linkedinUrl: draft.linkedinUrl,
+          tier: draft.tier,
+          accountType: draft.accountType,
+          clusterName: draft.firm || draft.name,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        vc?: unknown;
+      };
+
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || "Seed source could not be added. Is the local backend running?");
+      }
+      vc = payload.vc;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        backendUnavailable = true;
+      } else {
+        throw error;
+      }
+    }
+
+    if (backendUnavailable) {
+      vc = await addLocalVc({
         name: draft.name,
-        xHandle: draft.xHandle || draft.twitterUrl,
         linkedinUrl: draft.linkedinUrl,
-        tier: draft.tier === "vc" ? 1 : draft.tier === "microvc" ? 2 : 3,
-      }),
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-    };
-
-    if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || "VC could not be added. Start the local API with `python -m backend.main serve-api`.");
+        xHandle: draft.xHandle || draft.twitterUrl,
+        tier: draft.tier,
+        accountType: draft.accountType,
+      });
     }
 
     clearSignalCaches();
     await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
-    return payload;
+    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
+    return { ok: true, vc };
   });
 }
 
 export function useRemoveVcFromWatchlist() {
-  return useStaticMutation(async (_target: { watchlistItemId?: string; vcSourceId: string }) => undefined);
+  const queryClient = useQueryClient();
+
+  return useStaticMutation(async (target: { watchlistItemId?: string; vcSourceId: string }) => {
+    await removeLocalVc(target.vcSourceId);
+    clearSignalCaches();
+    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+  });
 }
 
 export function useTrackedPeople(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "tracked-people"],
-    queryFn: fetchTrackedGitPeople,
+    queryFn: fetchTrackedPeople,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
-
-  return withFrontendConfigState(query, _enabled, [] as TrackedPerson[]);
 }
 
 export function usePersonIdentities(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "person-identities"],
     queryFn: fetchPersonIdentities,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
-
-  return withFrontendConfigState(query, _enabled, [] as PersonIdentity[]);
 }
 
 export function useActivityEvents(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "activity-events"],
     queryFn: fetchActivityEvents,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
-
-  return withFrontendConfigState(query, _enabled, [] as ActivityEvent[]);
 }
 
 export function useVcXFollowObservations(_enabled = true) {
@@ -481,25 +437,84 @@ export function useVcXFollowObservations(_enabled = true) {
 }
 
 export function useWeeklyPicks(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "weekly-picks"],
     queryFn: fetchWeeklyPicks,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
+}
 
-  return withFrontendConfigState(query, _enabled, [] as WeeklyPick[]);
+export function useSeedFollowAlerts(_enabled = true) {
+  return useQuery({
+    queryKey: ["anytrace", "seed-follow-alerts"],
+    queryFn: fetchSeedFollowAlerts,
+    enabled: _enabled,
+    ...anytraceQueryOptions(),
+  });
+}
+
+export function usePromoteSeedFollowAlert() {
+  const queryClient = useQueryClient();
+
+  return useStaticMutation(async (input: SeedFollowPromotionDraft) => {
+    const response = await fetch(`${getBackendBaseUrl()}/seed-follow-alerts/promote-to-seed`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+    };
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Seed account could not be added. Is the local backend running?");
+    }
+
+    clearSignalCaches();
+    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
+    return payload;
+  });
+}
+
+export function useUpdateSeedFollowAlertStatus() {
+  const queryClient = useQueryClient();
+
+  return useStaticMutation(async (input: { alertId: string; status: "new" | "seen" | "archived" }) => {
+    const response = await fetch(`${getBackendBaseUrl()}/seed-follow-alerts/status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+    };
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Alert status could not be updated. Is the local backend running?");
+    }
+
+    clearSignalCaches();
+    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
+    return payload;
+  });
 }
 
 export function useGithubSignalProfiles(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "github-signal-profiles"],
     queryFn: fetchGithubSignalProfiles,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
-
-  return withFrontendConfigState(query, _enabled, [] as GithubSignalProfile[]);
 }
 
 export function useWatchlist(_enabled = true) {
@@ -509,81 +524,73 @@ export function useWatchlist(_enabled = true) {
   const githubProfilesQuery = useGithubSignalProfiles(_enabled);
   const weeklyPicksQuery = useWeeklyPicks(_enabled);
 
-  return useMemo(
-    () => {
-      const trackedPeople = trackedPeopleQuery.data ?? [];
-      const identities = identitiesQuery.data ?? [];
-      const githubProfiles = githubProfilesQuery.data ?? [];
-      const weeklyPicks = weeklyPicksQuery.data ?? [];
-      const identitiesByPerson = new Map<string, PersonIdentity[]>();
-      const weeklyPickByPerson = new Map(weeklyPicks.map((pick) => [pick.person.id, pick]));
-      const githubProfileByPerson = new Map(githubProfiles.map((profile) => [profile.personId, profile]));
+  return useMemo(() => {
+    const trackedPeople = trackedPeopleQuery.data ?? [];
+    const identities = identitiesQuery.data ?? [];
+    const githubProfiles = githubProfilesQuery.data ?? [];
+    const weeklyPicks = weeklyPicksQuery.data ?? [];
+    const identitiesByPerson = new Map<string, PersonIdentity[]>();
+    const weeklyPickByPerson = new Map(weeklyPicks.map((pick) => [pick.person.id, pick]));
+    const githubProfileByPerson = new Map(githubProfiles.map((profile) => [profile.personId, profile]));
 
-      for (const identity of identities) {
-        const list = identitiesByPerson.get(identity.personId) ?? [];
-        list.push(identity);
-        identitiesByPerson.set(identity.personId, list);
-      }
-      const selectedPeople = trackedPeople
-        .filter((person) => person.isWatchlist)
-        .map((person) => {
-          const personIdentities = identitiesByPerson.get(person.id) ?? [];
-          const weeklyPick = weeklyPickByPerson.get(person.id) ?? null;
-          const githubProfile = githubProfileByPerson.get(person.id) ?? null;
+    for (const identity of identities) {
+      const list = identitiesByPerson.get(identity.personId) ?? [];
+      list.push(identity);
+      identitiesByPerson.set(identity.personId, list);
+    }
 
-          return {
-            ...person,
-            identities: personIdentities,
-            signalsThisWeek: weeklyPick?.score ?? 0,
-            vcFollowersThisWeek: weeklyPick?.vcFollowCount ?? 0,
-            githubMomentum: githubProfile?.starDelta7d ?? 0,
-            bigTechExit: weeklyPick?.bigTechExit ?? false,
-            importantGithubFollowers: githubProfile?.recentGithubEvents ?? 0,
-            githubProfile,
-          } satisfies WatchlistPerson;
-        })
-        .sort((left, right) => {
-          const watchlistDiff = Number(right.isWatchlist) - Number(left.isWatchlist);
-          if (watchlistDiff !== 0) return watchlistDiff;
-          const signalDiff = right.githubMomentum - left.githubMomentum;
-          if (signalDiff !== 0) return signalDiff;
-          return left.fullName.localeCompare(right.fullName);
-        });
+    const selectedPeople = trackedPeople
+      .filter((person) => person.isWatchlist)
+      .map((person) => {
+        const personIdentities = identitiesByPerson.get(person.id) ?? [];
+        const weeklyPick = weeklyPickByPerson.get(person.id) ?? null;
+        const githubProfile = githubProfileByPerson.get(person.id) ?? null;
 
-      return {
-        data: {
-          ...EMPTY_WATCHLIST,
-          selectedVcs: mapVcsToWatchlistItems(vcsQuery.data ?? []),
-          people: selectedPeople,
-        } as WatchlistData,
-        isLoading:
-          vcsQuery.isLoading ||
-          trackedPeopleQuery.isLoading ||
-          identitiesQuery.isLoading ||
-          githubProfilesQuery.isLoading ||
-          weeklyPicksQuery.isLoading,
-        isError:
-          vcsQuery.isError ||
-          trackedPeopleQuery.isError ||
-          identitiesQuery.isError ||
-          githubProfilesQuery.isError ||
-          weeklyPicksQuery.isError,
-        error:
-          vcsQuery.error ||
-          trackedPeopleQuery.error ||
-          identitiesQuery.error ||
-          githubProfilesQuery.error ||
-          weeklyPicksQuery.error,
-      };
-    },
-    [vcsQuery, trackedPeopleQuery, identitiesQuery, githubProfilesQuery, weeklyPicksQuery],
-  );
+        return {
+          ...person,
+          identities: personIdentities,
+          signalsThisWeek: weeklyPick?.score ?? 0,
+          vcFollowersThisWeek: weeklyPick?.vcFollowCount ?? 0,
+          githubMomentum: githubProfile?.starDelta7d ?? 0,
+          bigTechExit: weeklyPick?.bigTechExit ?? false,
+          importantGithubFollowers: githubProfile?.recentGithubEvents ?? 0,
+          githubProfile,
+        } satisfies WatchlistPerson;
+      })
+      .sort((left, right) => left.fullName.localeCompare(right.fullName));
+
+    return {
+      data: {
+        ...EMPTY_WATCHLIST,
+        selectedVcs: mapVcsToWatchlistItems(vcsQuery.data ?? []),
+        people: selectedPeople,
+      } as WatchlistData,
+      isLoading:
+        vcsQuery.isLoading ||
+        trackedPeopleQuery.isLoading ||
+        identitiesQuery.isLoading ||
+        githubProfilesQuery.isLoading ||
+        weeklyPicksQuery.isLoading,
+      isError:
+        vcsQuery.isError ||
+        trackedPeopleQuery.isError ||
+        identitiesQuery.isError ||
+        githubProfilesQuery.isError ||
+        weeklyPicksQuery.isError,
+      error:
+        vcsQuery.error ||
+        trackedPeopleQuery.error ||
+        identitiesQuery.error ||
+        githubProfilesQuery.error ||
+        weeklyPicksQuery.error,
+    };
+  }, [vcsQuery, trackedPeopleQuery, identitiesQuery, githubProfilesQuery, weeklyPicksQuery]);
 }
 
 export function useAddGithubPersonToWatchlist() {
   const queryClient = useQueryClient();
 
-  return useStaticMutation(async (_input: {
+  return useStaticMutation(async (input: {
     existing?: {
       person: TrackedPerson;
       identities: PersonIdentity[];
@@ -599,70 +606,45 @@ export function useAddGithubPersonToWatchlist() {
       summary?: string;
     };
   }) => {
-    const draft = _input.draft;
-    const existing = _input.existing;
-    const payload = draft
-      ? {
-          fullName: draft.fullName,
-          githubHandle: draft.githubHandle,
-          xHandle: draft.xHandle,
-          linkedinUrl: draft.linkedinHandle,
-          roleTitle: draft.roleTitle,
-          company: draft.company,
-          location: draft.location,
-          summary: draft.summary,
-        }
-      : existing
-        ? {
-            fullName: existing.person.fullName,
-            githubHandle: existing.identities.find((identity) => identity.platform === "github")?.handle,
-            xHandle: existing.identities.find((identity) => identity.platform === "x")?.handle,
-            linkedinUrl: existing.identities.find((identity) => identity.platform === "linkedin")?.profileUrl,
-            roleTitle: existing.person.roleTitle,
-            company: existing.person.company,
-            location: existing.person.location,
-            summary: existing.person.summary,
-          }
-        : null;
+    const draft = input.draft;
+    const existing = input.existing;
 
-    if (!payload) {
+    if (!draft && !existing) {
       throw new Error("Tracked person payload missing.");
     }
 
-    const response = await fetch(`${getBackendBaseUrl()}/watchlist/add-tracked-person`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+    const trackedPerson = await addLocalTrackedPerson({
+      fullName: draft?.fullName || existing?.person.fullName || "",
+      githubHandle: draft?.githubHandle || existing?.identities.find((identity) => identity.platform === "github")?.handle,
+      xHandle: draft?.xHandle || existing?.identities.find((identity) => identity.platform === "x")?.handle,
+      linkedinUrl: draft?.linkedinHandle || existing?.identities.find((identity) => identity.platform === "linkedin")?.profileUrl,
+      roleTitle: draft?.roleTitle || existing?.person.roleTitle,
+      company: draft?.company || existing?.person.company,
+      location: draft?.location || existing?.person.location,
+      summary: draft?.summary || existing?.person.summary,
     });
-
-    const result = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-    };
-
-    if (!response.ok || result.ok === false) {
-      throw new Error(result.error || "Tracked person could not be added. Start the local API with `python -m backend.main serve-api`.");
-    }
 
     clearSignalCaches();
     await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
-    return result;
+    return { ok: true, trackedPerson };
   });
 }
 
 export function useRemoveGithubPersonFromWatchlist() {
-  return useStaticMutation(async (_personId: string) => undefined);
+  const queryClient = useQueryClient();
+
+  return useStaticMutation(async (personId: string) => {
+    await removeLocalTrackedPerson(personId);
+    clearSignalCaches();
+    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+  });
 }
 
 export function useGraphData(_enabled = true) {
-  const query = useQuery({
+  return useQuery({
     queryKey: ["anytrace", "graph"],
     queryFn: fetchGraphData,
     enabled: _enabled,
-    staleTime: 60_000,
+    ...anytraceQueryOptions(),
   });
-
-  return withFrontendConfigState(query, _enabled, EMPTY_GRAPH);
 }

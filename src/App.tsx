@@ -11,6 +11,7 @@ const MainDashboard = lazy(() => import("@/pages/Index"));
 const GraphPage = lazy(() => import("@/pages/Explore"));
 const ActivitiesPage = lazy(() => import("@/pages/Activities"));
 const WatchlistPage = lazy(() => import("@/pages/Watchlist"));
+const TopPicksPage = lazy(() => import("@/pages/TopPicks"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const ConnectionDetail = lazy(() => import("@/pages/Connections"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/graph" element={<GraphPage />} />
               <Route path="/activities" element={<ActivitiesPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/top-picks" element={<TopPicksPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/connections/:id" element={<ConnectionDetail />} />
             </Route>

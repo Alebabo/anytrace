@@ -26,7 +26,7 @@ class LinkedInScraper:
 
     def __init__(self, db: SupabaseDB | None = None, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
-        validate_settings(self.settings, "supabase", "linkedin")
+        validate_settings(self.settings, "linkedin")
         self.db = db or SupabaseDB.from_settings(self.settings)
 
     def _login(self, page: Page) -> None:

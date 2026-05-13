@@ -1,4 +1,4 @@
-import { ArrowUpRight, Github, Linkedin, Plus, Sparkles, Trash2, Twitter, X } from "lucide-react";
+import { ArrowUpRight, Linkedin, Plus, Sparkles, Trash2, Twitter, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ProductGate } from "@/components/anytrace/ProductGate";
@@ -7,35 +7,51 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAddGithubPersonToWatchlist,
   useAddVcToWatchlist,
   useAccessState,
-  useGraphData,
+  useAppSettings,
   usePersonIdentities,
   useRemoveGithubPersonFromWatchlist,
   useRemoveVcFromWatchlist,
+  useSeedFollowAlerts,
   useWatchlist,
 } from "@/hooks/useAnytrace";
-import type { PersonIdentity, UserVcWatchlistItem, WatchlistPerson } from "@/data/anytrace";
+import type { PersonIdentity, SeedFollowAlert, UserVcWatchlistItem, VcAccountType, VcTier, WatchlistPerson } from "@/data/anytrace";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 import { personDisplayLabel } from "@/lib/personLabels";
+import { isVisibleSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
 function identityFor(identities: PersonIdentity[], platform: PersonIdentity["platform"]) {
   return identities.find((identity) => identity.platform === platform);
 }
 
 function formatVcMeta(item: UserVcWatchlistItem["vcSource"]) {
-  return [item.country, item.sizeLabel, item.sectorFocus].filter(Boolean).join(" / ");
+  return [sourceKindLabel(item), item.country, item.sizeLabel, item.sectorFocus].filter(Boolean).join(" / ");
 }
 
+function sourceKindLabel(item: UserVcWatchlistItem["vcSource"]) {
+  if (item.accountType === "journalist" || item.tier === "journalist") return "Journalist";
+  if (item.tier === "angel") return "Angel";
+  if (item.tier === "microvc") return "Micro VC";
+  return "VC";
+}
+
+const SOURCE_TYPES: Array<{ value: VcTier; label: string; accountType: VcAccountType }> = [
+  { value: "vc", label: "VC", accountType: "firm" },
+  { value: "angel", label: "Angel", accountType: "partner" },
+  { value: "journalist", label: "Journalist", accountType: "journalist" },
+];
+
 type FollowSuggestion = {
-  person: WatchlistPerson;
+  alert: SeedFollowAlert;
   reason: string;
   primaryLink: string;
-  primaryLabel: "X" | "GitHub";
+  primaryLabel: "X";
 };
 
 function SelectedVcRow({
@@ -76,17 +92,6 @@ function SelectedVcRow({
               <Linkedin className="h-4 w-4" />
             </a>
           )}
-          {vcSource.githubUsername && (
-            <a
-              href={`https://github.com/${vcSource.githubUsername}`}
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-foreground"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Github className="h-4 w-4" />
-            </a>
-          )}
         </div>
         <Button
           variant="ghost"
@@ -114,7 +119,6 @@ function SelectedGithubRow({
   onRemove: (personId: string) => void;
   busy: boolean;
 }) {
-  const github = identityFor(person.identities, "github");
   const x = identityFor(person.identities, "x");
   const linkedin = identityFor(person.identities, "linkedin");
 
@@ -131,7 +135,7 @@ function SelectedGithubRow({
           <div className="truncate text-sm font-medium">{person.fullName}</div>
           <div className="mt-1 truncate text-xs text-muted-foreground">{personDisplayLabel(person)}</div>
           <div className="mt-1 text-[11px] text-muted-foreground">
-            {person.vcFollowersThisWeek} new VC follows / {person.githubMomentum} repo delta
+            {person.vcFollowersThisWeek} new seed-source follow{person.vcFollowersThisWeek === 1 ? "" : "s"}
           </div>
         </div>
       </div>
@@ -145,11 +149,6 @@ function SelectedGithubRow({
           {linkedin && (
             <a href={linkedin.profileUrl} target="_blank" rel="noreferrer" className="hover:text-signal-linkedin">
               <Linkedin className="h-4 w-4" />
-            </a>
-          )}
-          {github && (
-            <a href={github.profileUrl} target="_blank" rel="noreferrer" className="hover:text-foreground">
-              <Github className="h-4 w-4" />
             </a>
           )}
         </div>
@@ -168,27 +167,28 @@ function SelectedGithubRow({
 }
 
 function FollowSuggestionCard({ suggestion }: { suggestion: FollowSuggestion }) {
-  const github = identityFor(suggestion.person.identities, "github");
-  const x = identityFor(suggestion.person.identities, "x");
+  const triggerNames = suggestion.alert.triggeringSeedAccounts
+    .slice(0, 2)
+    .map((account) => account.name)
+    .join(" + ");
 
   return (
     <div className="w-[min(100%,20rem)] shrink-0 snap-start rounded-[24px] border border-border bg-card p-4 sm:w-[280px]">
       <div className="flex items-start gap-3">
-        <EntityAvatar
-          name={suggestion.person.fullName}
-          imageUrls={avatarSourcesForPerson(suggestion.person, suggestion.person.identities)}
-          size={44}
-          rounded="xl"
-        />
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface-sunken text-sm font-medium">
+          {suggestion.alert.displayName.slice(0, 2).toUpperCase()}
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{suggestion.person.fullName}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">{personDisplayLabel(suggestion.person)}</div>
+          <div className="truncate text-sm font-medium">{suggestion.alert.displayName}</div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">
+            {suggestion.alert.currentSeedFollowerCount} tracked seed follows
+          </div>
         </div>
       </div>
 
       <div className="mt-3 flex items-start gap-2 rounded-2xl bg-surface-sunken px-3 py-2 text-xs text-muted-foreground">
         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>{suggestion.reason}</span>
+        <span>{triggerNames ? `${triggerNames}: ${suggestion.reason}` : suggestion.reason}</span>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -197,20 +197,6 @@ function FollowSuggestionCard({ suggestion }: { suggestion: FollowSuggestion }) 
             Follow on {suggestion.primaryLabel} <ArrowUpRight className="h-3.5 w-3.5" />
           </a>
         </Button>
-        {x && suggestion.primaryLabel !== "X" && (
-          <Button asChild variant="outline" size="sm" className="rounded-full">
-            <a href={x.profileUrl} target="_blank" rel="noreferrer">
-              X
-            </a>
-          </Button>
-        )}
-        {github && suggestion.primaryLabel !== "GitHub" && (
-          <Button asChild variant="outline" size="sm" className="rounded-full">
-            <a href={github.profileUrl} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-          </Button>
-        )}
       </div>
     </div>
   );
@@ -219,8 +205,9 @@ function FollowSuggestionCard({ suggestion }: { suggestion: FollowSuggestion }) 
 export default function WatchlistPage() {
   const navigate = useNavigate();
   const { access } = useAccessState();
+  const appSettings = useAppSettings(access.isAuthenticated);
   const watchlistQuery = useWatchlist(access.isAuthenticated);
-  const graphQuery = useGraphData(access.isAuthenticated);
+  const seedAlertsQuery = useSeedFollowAlerts(access.isAuthenticated);
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
   const addVc = useAddVcToWatchlist();
   const addTrackedPerson = useAddGithubPersonToWatchlist();
@@ -230,6 +217,8 @@ export default function WatchlistPage() {
     name: "",
     xHandle: "",
     linkedinUrl: "",
+    tier: "vc" as VcTier,
+    accountType: "firm" as VcAccountType,
   });
   const [personDraft, setPersonDraft] = useState({
     fullName: "",
@@ -245,77 +234,28 @@ export default function WatchlistPage() {
   const [showAddPersonForm, setShowAddPersonForm] = useState(false);
 
   const watchlist = watchlistQuery.data;
+  const activeThreshold = appSettings.data?.seedFollowAlertThreshold ?? 2;
   const selectedVcs = useMemo(() => watchlist?.selectedVcs ?? [], [watchlist?.selectedVcs]);
   const selectedGithubPeople = useMemo(() => watchlist?.people ?? [], [watchlist?.people]);
   const followSuggestions = useMemo(() => {
-    const graphPeople = graphQuery.data?.people ?? [];
-    const graphEvents = graphQuery.data?.events ?? [];
-    const identities = identitiesQuery.data ?? [];
-    const peopleById = new Map<string, WatchlistPerson>();
-    const identitiesByPerson = new Map<string, PersonIdentity[]>();
-
-    for (const identity of identities) {
-      const list = identitiesByPerson.get(identity.personId) ?? [];
-      list.push(identity);
-      identitiesByPerson.set(identity.personId, list);
-    }
-
-    for (const person of selectedGithubPeople) {
-      peopleById.set(person.id, person);
-    }
-
-    for (const person of graphPeople) {
-      if (peopleById.has(person.id)) continue;
-      const personIdentities = identitiesByPerson.get(person.id) ?? [];
-      peopleById.set(person.id, {
-        ...person,
-        identities: personIdentities,
-        signalsThisWeek: 0,
-        vcFollowersThisWeek: 0,
-        githubMomentum: 0,
-        bigTechExit: false,
-        importantGithubFollowers: 0,
-        githubProfile: null,
-      });
-    }
-
-    const suggestions = [...peopleById.values()]
-      .map((person) => {
-        const personEvents = graphEvents.filter((event) => event.personId === person.id);
-        const xFollowCount = personEvents.filter((event) => event.eventType === "vc_follow").length;
-        const githubFollowCount = personEvents.filter((event) => event.eventType === "important_github_follower").length;
-        const viralRepoCount = personEvents.filter((event) => event.eventType === "viral_repo").length;
-        const xIdentity = identityFor(person.identities, "x");
-        const githubIdentity = identityFor(person.identities, "github");
-        const primaryLink = xIdentity?.profileUrl || githubIdentity?.profileUrl || "";
-        const primaryLabel = xIdentity ? "X" : "GitHub";
-
-        if (!primaryLink) return null;
-
-        let reason = "Worth tracking for fresh technical and network signals.";
-        if (viralRepoCount > 0) {
-          reason = viralRepoCount === 1 ? "New viral GitHub repo spotted." : `${viralRepoCount} new viral GitHub repos spotted.`;
-        } else if (githubFollowCount > 0) {
-          reason = githubFollowCount === 1 ? "New GitHub follow signal detected." : `${githubFollowCount} new GitHub follow signals detected.`;
-        } else if (xFollowCount > 0) {
-          reason = xFollowCount === 1 ? "New VC follow on X detected." : `${xFollowCount} new VC follows on X detected.`;
-        }
-
-        const score = viralRepoCount * 100 + githubFollowCount * 20 + xFollowCount * 15 + Number(person.isWatchlist) * 5;
-        return {
-          person,
-          reason,
-          primaryLink,
-          primaryLabel,
-          score,
-        };
+    const suggestions = [...(seedAlertsQuery.data ?? [])]
+      .filter(isVisibleSeedFollowAlert)
+      .filter((alert) => alert.currentSeedFollowerCount >= activeThreshold)
+      .sort((left, right) => {
+        const countDiff = right.currentSeedFollowerCount - left.currentSeedFollowerCount;
+        if (countDiff !== 0) return countDiff;
+        return new Date(right.triggeredAt || 0).getTime() - new Date(left.triggeredAt || 0).getTime();
       })
-      .filter((suggestion): suggestion is FollowSuggestion & { score: number } => !!suggestion)
-      .sort((left, right) => right.score - left.score || left.person.fullName.localeCompare(right.person.fullName))
+      .map((alert) => ({
+        alert,
+        reason: `New person crossed the ${alert.alertThreshold ?? 2}-seed-account threshold.`,
+        primaryLink: alert.primaryProfileUrl,
+        primaryLabel: "X" as const,
+      }))
       .slice(0, 5);
 
     return suggestions;
-  }, [graphQuery.data?.events, graphQuery.data?.people, identitiesQuery.data, selectedGithubPeople]);
+  }, [activeThreshold, seedAlertsQuery.data]);
 
   return (
     <ProductGate
@@ -332,11 +272,11 @@ export default function WatchlistPage() {
             <div>
               <div className="text-lg font-medium">Who To Follow</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Five fresh profiles worth following on X or GitHub.
+                Five alert-qualified profiles worth following on X.
               </div>
             </div>
 
-            {watchlistQuery.isLoading || identitiesQuery.isLoading || graphQuery.isLoading ? (
+            {watchlistQuery.isLoading || identitiesQuery.isLoading || seedAlertsQuery.isLoading ? (
               <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Skeleton key={index} className="h-40 w-[280px] shrink-0 rounded-[24px]" />
@@ -351,7 +291,7 @@ export default function WatchlistPage() {
                 <div className="flex snap-x snap-mandatory gap-3">
                   {followSuggestions.map((suggestion) => (
                     <FollowSuggestionCard
-                      key={`${suggestion.person.id}-${suggestion.primaryLabel}`}
+                      key={`${suggestion.alert.id}-${suggestion.primaryLabel}`}
                       suggestion={suggestion}
                     />
                   ))}
@@ -365,9 +305,9 @@ export default function WatchlistPage() {
               <AccordionItem value="selected-vcs" className="border-border">
                 <AccordionTrigger className="py-5 text-left hover:no-underline">
                   <div>
-                    <div className="text-lg font-medium">Selected VCs</div>
+                    <div className="text-lg font-medium">Tracked seed sources</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {selectedVcs.length} tracked VC{selectedVcs.length === 1 ? "" : "s"} in this list.
+                      {selectedVcs.length} seed source{selectedVcs.length === 1 ? "" : "s"} in this list.
                     </div>
                   </div>
                 </AccordionTrigger>
@@ -375,7 +315,7 @@ export default function WatchlistPage() {
                   <div className="mb-4 rounded-[24px] border border-border bg-surface-sunken/50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-medium">Add VC</div>
+                        <div className="text-sm font-medium">Add seed source</div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           Formular nur bei Bedarf aufklappen.
                         </div>
@@ -386,19 +326,41 @@ export default function WatchlistPage() {
                         size="icon"
                         className="h-8 w-8 rounded-full"
                         onClick={() => setShowAddVcForm((value) => !value)}
-                        aria-label={showAddVcForm ? "Close add VC form" : "Open add VC form"}
+                        aria-label={showAddVcForm ? "Close add seed source form" : "Open add seed source form"}
                       >
                         {showAddVcForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                       </Button>
                     </div>
                     {showAddVcForm && (
                       <>
-                        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <div className="mt-4 grid gap-3 md:grid-cols-4">
                           <Input
                             value={vcDraft.name}
                             onChange={(event) => setVcDraft((current) => ({ ...current, name: event.target.value }))}
-                            placeholder="VC name"
+                            placeholder="Source name"
                           />
+                          <Select
+                            value={vcDraft.tier}
+                            onValueChange={(value) => {
+                              const option = SOURCE_TYPES.find((item) => item.value === value) ?? SOURCE_TYPES[0];
+                              setVcDraft((current) => ({
+                                ...current,
+                                tier: option.value,
+                                accountType: option.accountType,
+                              }));
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SOURCE_TYPES.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Input
                             value={vcDraft.xHandle}
                             onChange={(event) => setVcDraft((current) => ({ ...current, xHandle: event.target.value }))}
@@ -425,7 +387,8 @@ export default function WatchlistPage() {
                                   twitterUrl: "",
                                   linkedinUrl: vcDraft.linkedinUrl,
                                   xHandle: vcDraft.xHandle,
-                                  tier: "vc",
+                                  tier: vcDraft.tier,
+                                  accountType: vcDraft.accountType,
                                 },
                                 {
                                   onSuccess: () => {
@@ -433,6 +396,8 @@ export default function WatchlistPage() {
                                       name: "",
                                       xHandle: "",
                                       linkedinUrl: "",
+                                      tier: "vc",
+                                      accountType: "firm",
                                     });
                                     setShowAddVcForm(false);
                                   },
@@ -440,7 +405,7 @@ export default function WatchlistPage() {
                               )
                             }
                           >
-                            VC hinzufügen
+                            Quelle hinzufuegen
                           </Button>
                           {addVc.isError && (
                             <div className="text-sm text-destructive">{(addVc.error as Error)?.message}</div>
@@ -462,7 +427,7 @@ export default function WatchlistPage() {
                     </div>
                   ) : selectedVcs.length === 0 ? (
                     <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                      Keine VCs gefunden. Prüfe `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` und ob dein neues Supabase-Projekt `vcs`-Einträge und passende RLS-Regeln hat.
+                      Keine Seed-Quellen gefunden. Die lokale Seed-Liste ist leer oder wurde komplett ausgeblendet.
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -483,9 +448,9 @@ export default function WatchlistPage() {
               <AccordionItem value="selected-git-people" className="border-b-0 border-border">
                 <AccordionTrigger className="py-5 text-left hover:no-underline">
                   <div>
-                    <div className="text-lg font-medium">Selected Git people</div>
+                    <div className="text-lg font-medium">Tracked people</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {selectedGithubPeople.length} GitHub profile{selectedGithubPeople.length === 1 ? "" : "s"} currently selected.
+                      {selectedGithubPeople.length} manually tracked profile{selectedGithubPeople.length === 1 ? "" : "s"}.
                     </div>
                   </div>
                 </AccordionTrigger>
@@ -521,11 +486,6 @@ export default function WatchlistPage() {
                             value={personDraft.roleTitle}
                             onChange={(event) => setPersonDraft((current) => ({ ...current, roleTitle: event.target.value }))}
                             placeholder="Role title"
-                          />
-                          <Input
-                            value={personDraft.githubHandle}
-                            onChange={(event) => setPersonDraft((current) => ({ ...current, githubHandle: event.target.value }))}
-                            placeholder="GitHub handle"
                           />
                           <Input
                             value={personDraft.xHandle}
@@ -609,7 +569,7 @@ export default function WatchlistPage() {
                     </div>
                   ) : selectedGithubPeople.length === 0 ? (
                     <div className="rounded-[28px] border border-border bg-card p-8 text-sm text-muted-foreground">
-                      Noch keine GitHub-Personen in der gemeinsamen Datenbasis gefunden.
+                      Noch keine manuell getrackten Personen in der gemeinsamen Datenbasis gefunden.
                     </div>
                   ) : (
                     <div className="space-y-3">
