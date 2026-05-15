@@ -87,17 +87,17 @@
     @apply bg-background text-foreground antialiased;
     font-family: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
     font-feature-settings: "ss01", "ss02", "cv11";
-    letter-spacing: -0.011em;
+    letter-spacing: 0;
   }
   .font-serif {
     font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
     font-weight: 500;
-    letter-spacing: -0.035em;
+    letter-spacing: 0;
   }
   .font-display {
     font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
     font-weight: 500;
-    letter-spacing: -0.035em;
+    letter-spacing: 0;
   }
   .font-mono {
     font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -154,6 +154,10 @@
   .anytrace-graph-flow .react-flow__node {
     z-index: 2 !important;
   }
+
+  .e2e-log-current {
+    animation: anytrace-log-flicker 1.15s ease-in-out infinite;
+  }
 }
 
 @layer utilities {
@@ -178,5 +182,17 @@
 
   50% {
     transform: translate3d(0, -12px, 0);
+  }
+}
+
+@keyframes anytrace-log-flicker {
+  0%, 100% {
+    background: hsl(0 0% 100%);
+    box-shadow: 0 1px 2px hsl(174 30% 10% / 0.05);
+  }
+
+  45% {
+    background: hsl(50 95% 96%);
+    box-shadow: 0 10px 30px -18px hsl(174 60% 12% / 0.55);
   }
 }

@@ -29,6 +29,7 @@ class Settings:
     tweetapi_page_size: int
     tweetapi_max_pages: int
     tweetapi_incremental_min_pages: int
+    tweetapi_known_sequence_stop_count: int
     tweetapi_deep_scan_interval_hours: int
     twitter_request_timeout_seconds: int
     github_token: str
@@ -48,6 +49,7 @@ class Settings:
     github_min_star_delta_7d_for_event: int
     github_min_total_stars_for_event: int
     github_min_indicator_count_for_event: int
+    github_public_lookup: bool
     github_viral_repo_limit: int
     github_viral_min_stars: int
     github_viral_min_star_delta_7d: int
@@ -57,8 +59,17 @@ class Settings:
     make_linkedin_batch_limit: int
     public_api_base_url: str
     seed_follow_alert_threshold: int
+    featherless_api_key: str
+    featherless_base_url: str
+    featherless_triage_model: str
+    featherless_triage_mock: bool
+    triage_candidate_limit: int
     linkedin_min_delay_seconds: int
     linkedin_max_delay_seconds: int
+    linkedin_storage_state_path: str
+    linkedin_headless: bool
+    linkedin_scrape_batch_limit: int
+    linkedin_public_scrape: bool
 
 
 def validate_settings(settings: Settings, *scopes: str) -> None:
@@ -114,6 +125,7 @@ def get_settings() -> Settings:
         tweetapi_page_size=int(_env("TWEETAPI_PAGE_SIZE", "100")),
         tweetapi_max_pages=int(_env("TWEETAPI_MAX_PAGES", "6")),
         tweetapi_incremental_min_pages=int(_env("TWEETAPI_INCREMENTAL_MIN_PAGES", "2")),
+        tweetapi_known_sequence_stop_count=max(0, int(_env("TWEETAPI_KNOWN_SEQUENCE_STOP_COUNT", "8"))),
         tweetapi_deep_scan_interval_hours=int(_env("TWEETAPI_DEEP_SCAN_INTERVAL_HOURS", "20")),
         twitter_request_timeout_seconds=int(_env("TWITTER_REQUEST_TIMEOUT_SECONDS", "30")),
         github_token=_env("GITHUB_TOKEN", ""),
@@ -133,6 +145,7 @@ def get_settings() -> Settings:
         github_min_star_delta_7d_for_event=int(_env("GITHUB_MIN_STAR_DELTA_7D_FOR_EVENT", "40")),
         github_min_total_stars_for_event=int(_env("GITHUB_MIN_TOTAL_STARS_FOR_EVENT", "100")),
         github_min_indicator_count_for_event=int(_env("GITHUB_MIN_INDICATOR_COUNT_FOR_EVENT", "2")),
+        github_public_lookup=_env("GITHUB_PUBLIC_LOOKUP", "true").strip().lower() in {"1", "true", "yes", "on"},
         github_viral_repo_limit=int(_env("GITHUB_VIRAL_REPO_LIMIT", "20")),
         github_viral_min_stars=int(_env("GITHUB_VIRAL_MIN_STARS", "150")),
         github_viral_min_star_delta_7d=int(_env("GITHUB_VIRAL_MIN_STAR_DELTA_7D", "25")),
@@ -141,7 +154,16 @@ def get_settings() -> Settings:
         make_linkedin_webhook_secret=_env("MAKE_LINKEDIN_WEBHOOK_SECRET", _env("LINKEDIN_MAKE_WEBHOOK_SECRET", "")).strip(),
         make_linkedin_batch_limit=int(_env("MAKE_LINKEDIN_BATCH_LIMIT", "25")),
         public_api_base_url=_env("ANYTRACE_PUBLIC_API_BASE_URL", "").strip().rstrip("/"),
-        seed_follow_alert_threshold=int(_env("SEED_FOLLOW_ALERT_THRESHOLD", "2")),
+        seed_follow_alert_threshold=int(_env("SEED_FOLLOW_ALERT_THRESHOLD", "3")),
+        featherless_api_key=_env("FEATHERLESS_API_KEY", "").strip(),
+        featherless_base_url=_env("FEATHERLESS_BASE_URL", "https://api.featherless.ai/v1").strip().rstrip("/"),
+        featherless_triage_model=_env("FEATHERLESS_TRIAGE_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct").strip(),
+        featherless_triage_mock=_env("FEATHERLESS_TRIAGE_MOCK", "false").strip().lower() in {"1", "true", "yes", "on"},
+        triage_candidate_limit=max(1, int(_env("TRIAGE_CANDIDATE_LIMIT", "25"))),
         linkedin_min_delay_seconds=int(_env("LINKEDIN_MIN_DELAY_SECONDS", "30")),
         linkedin_max_delay_seconds=int(_env("LINKEDIN_MAX_DELAY_SECONDS", "90")),
+        linkedin_storage_state_path=_env("LINKEDIN_STORAGE_STATE_PATH", "backend/local_data/linkedin_state.json").strip(),
+        linkedin_headless=_env("LINKEDIN_HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"},
+        linkedin_scrape_batch_limit=max(1, int(_env("LINKEDIN_SCRAPE_BATCH_LIMIT", "10"))),
+        linkedin_public_scrape=_env("LINKEDIN_PUBLIC_SCRAPE", "true").strip().lower() in {"1", "true", "yes", "on"},
     )

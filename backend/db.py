@@ -14,7 +14,7 @@ from backend.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 UTC = timezone.utc
-DEFAULT_SEED_FOLLOW_ALERT_THRESHOLD = 2
+DEFAULT_SEED_FOLLOW_ALERT_THRESHOLD = 3
 MIN_SEED_FOLLOW_ALERT_THRESHOLD = 2
 MAX_SEED_FOLLOW_ALERT_THRESHOLD = 10
 
@@ -305,7 +305,7 @@ class SupabaseDB:
                   role_title text,
                   company text,
                   location text,
-                  source text not null default 'make',
+                  source text not null default 'linkedin_native_scraper',
                   raw_payload text not null,
                   observed_at text not null,
                   created_at text not null
@@ -481,6 +481,22 @@ class SupabaseDB:
                   score_impact integer default 0,
                   created_at text not null
                 );
+
+                create table if not exists triage_runs (
+                  id text primary key,
+                  status text not null,
+                  threshold integer not null,
+                  provider text not null,
+                  model text,
+                  candidate_count integer default 0,
+                  qualified_count integer default 0,
+                  error text,
+                  payload text not null,
+                  started_at text not null,
+                  completed_at text,
+                  created_at text not null
+                );
+                create index if not exists triage_runs_created_at_idx on triage_runs (created_at desc);
                 """
             )
             existing_alert_columns = {
@@ -499,6 +515,78 @@ class SupabaseDB:
                 connection.execute(
                     "alter table seed_follow_alert_events add column promoted_at text"
                 )
+
+    def insert_triage_run(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        threshold: int,
+        provider: str,
+        model: str | None,
+        candidate_count: int,
+        qualified_count: int,
+        payload: dict[str, Any],
+        started_at: str,
+        completed_at: str | None = None,
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        now = _now_iso()
+        self._execute(
+            """
+            insert into triage_runs (
+              id,
+              status,
+              threshold,
+              provider,
+              model,
+              candidate_count,
+              qualified_count,
+              error,
+              payload,
+              started_at,
+              completed_at,
+              created_at
+            )
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                status,
+                threshold,
+                provider,
+                model,
+                candidate_count,
+                qualified_count,
+                error,
+                _json_dump(payload),
+                started_at,
+                completed_at,
+                now,
+            ),
+        )
+        return self.get_triage_run(run_id) or {
+            "id": run_id,
+            "status": status,
+            "payload": payload,
+        }
+
+    def get_triage_run(self, run_id: str) -> dict[str, Any] | None:
+        normalized_id = (run_id or "").strip()
+        if not normalized_id:
+            return None
+        row = self._fetchone("select * from triage_runs where id = ? limit 1", (normalized_id,))
+        if not row:
+            return None
+        row["payload"] = _json_load(row.get("payload"), {})
+        return row
+
+    def get_latest_triage_run(self) -> dict[str, Any] | None:
+        row = self._fetchone("select * from triage_runs order by created_at desc limit 1")
+        if not row:
+            return None
+        row["payload"] = _json_load(row.get("payload"), {})
+        return row
 
     def _seed_vcs_from_frontend_seed(self) -> None:
         seed_path = Path(__file__).resolve().parents[1] / "src" / "data" / "localSeedData.json"
@@ -1406,8 +1494,10 @@ class SupabaseDB:
             (normalized_alert_id,),
         ) or {"id": normalized_alert_id, "status": normalized_status}
 
-    def list_seed_follow_alerts(self, *, include_promoted: bool = False) -> list[dict[str, Any]]:
+    def list_seed_follow_alerts(self, *, include_promoted: bool = False, limit: int | None = None) -> list[dict[str, Any]]:
         promoted_filter = "" if include_promoted else "where coalesce(a.status, 'new') != 'promoted'"
+        limit_clause = "limit ?" if limit is not None and limit > 0 else ""
+        params: tuple[Any, ...] = (int(limit),) if limit_clause else ()
         rows = self._fetchall(
             f"""
             select
@@ -1431,8 +1521,43 @@ class SupabaseDB:
             join discovered_people p on p.id = a.discovered_person_id
             {promoted_filter}
             order by a.triggered_at desc, a.created_at desc
-            """
+            {limit_clause}
+            """,
+            params,
         )
+
+        person_ids = [str(row["discovered_person_id"]) for row in rows if row.get("discovered_person_id")]
+        followers_by_person_id: dict[str, list[dict[str, Any]]] = {person_id: [] for person_id in person_ids}
+        chunk_size = 500
+        for start in range(0, len(person_ids), chunk_size):
+            chunk = person_ids[start : start + chunk_size]
+            if not chunk:
+                continue
+            placeholders = ", ".join("?" for _ in chunk)
+            follower_rows = self._fetchall(
+                f"""
+                select
+                  o.discovered_person_id,
+                  o.seed_vc_id,
+                  o.first_seen_at,
+                  o.last_seen_at,
+                  o.created_at,
+                  v.name,
+                  v.twitter_handle,
+                  v.account_type,
+                  v.tier
+                from seed_follow_observations o
+                join vcs v on v.id = o.seed_vc_id
+                where o.discovered_person_id in ({placeholders})
+                order by o.discovered_person_id, o.first_seen_at asc, o.created_at asc
+                """,
+                tuple(chunk),
+            )
+            for follower in follower_rows:
+                person_id = follower.get("discovered_person_id")
+                if person_id in followers_by_person_id:
+                    followers_by_person_id[person_id].append(follower)
+
         for row in rows:
             row["triggering_seed_accounts"] = _json_load(row.get("triggering_seed_accounts"), [])
             row["trigger_threshold"] = normalize_seed_follow_alert_threshold(
@@ -1441,16 +1566,7 @@ class SupabaseDB:
             triggered_at = str(row.get("triggered_at") or "").strip()
             if len(triggered_at) <= 10 and row.get("created_at"):
                 row["triggered_at"] = row["created_at"]
-            follower_rows = self._fetchall(
-                """
-                select o.seed_vc_id, o.first_seen_at, o.last_seen_at, v.name, v.twitter_handle, v.account_type, v.tier
-                from seed_follow_observations o
-                join vcs v on v.id = o.seed_vc_id
-                where o.discovered_person_id = ?
-                order by o.first_seen_at asc, o.created_at asc
-                """,
-                (row["discovered_person_id"],),
-            )
+            follower_rows = followers_by_person_id.get(str(row.get("discovered_person_id")), [])
             row["seed_followers"] = [
                 {
                     "id": follower["seed_vc_id"],
@@ -1488,7 +1604,7 @@ class SupabaseDB:
         role_title: str | None,
         company: str | None,
         location: str | None,
-        source: str = "make",
+        source: str = "linkedin_native_scraper",
         raw_payload: dict[str, Any] | list[Any] | None = None,
         observed_at: str | None = None,
     ) -> dict[str, Any]:
@@ -1500,7 +1616,7 @@ class SupabaseDB:
         now = _now_iso()
         event_id = str(uuid4())
         observed_at_value = (observed_at or now).strip() or now
-        source_value = (source or "make").strip() or "make"
+        source_value = (source or "linkedin_native_scraper").strip() or "linkedin_native_scraper"
         self._execute(
             """
             insert into linkedin_enrichment_events (
@@ -1581,6 +1697,59 @@ class SupabaseDB:
         for row in rows:
             row["indicators"] = _json_load(row.get("indicators"), [])
         return rows
+
+    def list_latest_github_repo_snapshots_by_tracked_person(self) -> dict[str, list[dict[str, Any]]]:
+        rows = self._fetchall(
+            """
+            select *
+            from github_repo_snapshots
+            order by snapshot_date desc, star_delta_7d desc, stars desc
+            """
+        )
+        latest_by_person: dict[str, list[dict[str, Any]]] = {}
+        seen_repo_keys: set[tuple[str, str]] = set()
+        for row in rows:
+            person_id = str(row.get("tracked_person_id") or "").strip()
+            repo_owner = str(row.get("repo_owner") or "").strip()
+            repo_name = str(row.get("repo_name") or "").strip()
+            if not person_id or not repo_name:
+                continue
+            repo_key = (person_id, f"{repo_owner}/{repo_name}" if repo_owner else repo_name)
+            if repo_key in seen_repo_keys:
+                continue
+            seen_repo_keys.add(repo_key)
+            latest_by_person.setdefault(person_id, []).append(row)
+        for person_id, snapshots in latest_by_person.items():
+            latest_by_person[person_id] = sorted(
+                snapshots,
+                key=lambda row: (
+                    int(row.get("star_delta_7d") or 0),
+                    int(row.get("stars") or 0),
+                    str(row.get("snapshot_date") or ""),
+                ),
+                reverse=True,
+            )
+        return latest_by_person
+
+    def list_recent_github_person_events_by_tracked_person(self, *, limit_per_person: int = 5) -> dict[str, list[dict[str, Any]]]:
+        rows = self._fetchall(
+            """
+            select *
+            from github_person_events
+            order by occurred_at desc, created_at desc
+            """
+        )
+        events_by_person: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            person_id = str(row.get("tracked_person_id") or "").strip()
+            if not person_id:
+                continue
+            bucket = events_by_person.setdefault(person_id, [])
+            if len(bucket) >= limit_per_person:
+                continue
+            row["detail"] = _json_load(row.get("detail"), {})
+            bucket.append(row)
+        return events_by_person
 
     def list_github_observed_usernames(self, *, source_tracked_person_id: str, relationship_type: str) -> set[str]:
         rows = self._fetchall(

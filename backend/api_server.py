@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import hmac
+import threading
 from dataclasses import asdict, is_dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
@@ -14,6 +15,22 @@ import requests
 
 logger = logging.getLogger(__name__)
 _AVATAR_CACHE: dict[str, str] = {}
+_SEED_SCAN_LOCK = threading.Lock()
+_SEED_SCAN_STATUS: dict[str, Any] = {
+    "status": "idle",
+    "startedAt": None,
+    "completedAt": None,
+    "limit": None,
+    "count": 0,
+    "total": 0,
+    "remaining": 0,
+    "currentAccount": None,
+    "currentHandle": None,
+    "lastCompletedAccount": None,
+    "failed": 0,
+    "skipped": 0,
+    "error": None,
+}
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -24,6 +41,99 @@ def _to_jsonable(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: _to_jsonable(item) for key, item in value.items()}
     return value
+
+
+def _seed_scan_status() -> dict[str, Any]:
+    with _SEED_SCAN_LOCK:
+        return dict(_SEED_SCAN_STATUS)
+
+
+def _seed_scan_summary(settings: Any | None = None, db: Any | None = None) -> dict[str, Any]:
+    from backend.config import get_settings
+    from backend.db import SupabaseDB
+    from backend.twitter_state import create_twitter_state_store
+
+    settings = settings or get_settings()
+    db = db or SupabaseDB.from_settings(settings)
+    state_store = create_twitter_state_store(settings, db)
+    if hasattr(state_store, "get_twitter_summary"):
+        twitter_summary = state_store.get_twitter_summary()
+    else:
+        snapshots = state_store.list_twitter_snapshots()
+        twitter_summary = {
+            "snapshotCount": len(snapshots),
+            "latestSnapshotAt": max((row.get("created_at") for row in snapshots if row.get("created_at")), default=None),
+            "scannedSeedCount": None,
+            "latestRunAt": None,
+        }
+
+    observation_row = db._fetchone("select count(*) as count, max(created_at) as latest_at from seed_follow_observations") or {}
+    alert_row = db._fetchone("select count(*) as count, max(triggered_at) as latest_at from seed_follow_alert_events") or {}
+    latest_run_at = twitter_summary.get("latestRunAt") or observation_row.get("latest_at") or twitter_summary.get("latestSnapshotAt")
+
+    return {
+        "latestRunAt": latest_run_at,
+        "latestSnapshotAt": twitter_summary.get("latestSnapshotAt"),
+        "snapshotCount": int(twitter_summary.get("snapshotCount") or 0),
+        "scannedSeedCount": twitter_summary.get("scannedSeedCount"),
+        "observationCount": int(observation_row.get("count") or 0),
+        "alertCount": int(alert_row.get("count") or 0),
+        "latestAlertAt": alert_row.get("latest_at"),
+    }
+
+
+def _parse_seed_scan_limit(body: dict[str, Any]) -> int | None:
+    raw = body.get("limit")
+    raw_text = str(raw).strip().lower() if raw is not None else ""
+    if raw is None or raw_text in {"", "all", "none", "null", "unlimited"}:
+        return None
+    if raw_text == "default":
+        return None
+    try:
+        return max(1, int(float(str(raw))))
+    except (TypeError, ValueError):
+        return None
+
+
+def _health_payload() -> dict[str, Any]:
+    from backend.config import get_settings
+    from backend.db import SupabaseDB
+
+    settings = get_settings()
+    db = SupabaseDB.from_settings(settings)
+    latest_triage = db.get_latest_triage_run()
+    return {
+        "ok": True,
+        "service": "anytrace-ai-api",
+        "storage": {
+            "backend": "sqlite",
+            "path": settings.local_db_path,
+        },
+        "triage": {
+            "latestRunId": latest_triage.get("id") if latest_triage else None,
+            "latestStatus": latest_triage.get("status") if latest_triage else "empty",
+            "threshold": db.get_seed_follow_alert_threshold(),
+        },
+        "featherless": {
+            "configured": bool(settings.featherless_api_key),
+            "baseUrl": settings.featherless_base_url,
+            "model": settings.featherless_triage_model,
+            "mock": settings.featherless_triage_mock,
+        },
+        "linkedin": {
+            "configured": bool(settings.li_username and settings.li_password),
+            "storageStatePath": settings.linkedin_storage_state_path,
+            "headless": settings.linkedin_headless,
+            "batchLimit": settings.linkedin_scrape_batch_limit,
+            "publicScrape": settings.linkedin_public_scrape,
+            "scraperEnabled": bool(settings.li_username and settings.li_password),
+        },
+        "seedScan": {
+            "status": _seed_scan_status(),
+            "summary": _seed_scan_summary(settings, db),
+        },
+        "vultrReady": True,
+    }
 
 
 def _clean_x_image_url(value: str) -> str:
@@ -160,11 +270,14 @@ def _body_bool(body: dict[str, Any], key: str, default: bool) -> bool:
 def _frontend_data_payload() -> dict[str, Any]:
     from datetime import date, datetime, timedelta, timezone
 
+    from backend.config import get_settings
     from backend.db import SupabaseDB, normalize_handle
 
     utc = timezone.utc
-    db = SupabaseDB.from_settings()
+    settings = get_settings()
+    db = SupabaseDB.from_settings(settings)
     alert_threshold = db.get_seed_follow_alert_threshold()
+    seed_scan_summary = _seed_scan_summary(settings, db)
     try:
         backfill_stats = db.backfill_seed_follow_alerts_from_snapshots()
         if backfill_stats.get("observationsCreated") or backfill_stats.get("alertsCreated"):
@@ -793,7 +906,7 @@ def _frontend_data_payload() -> dict[str, Any]:
         for vc in vcs
     ]
     seed_follow_alerts: list[dict[str, Any]] = []
-    for alert in db.list_seed_follow_alerts():
+    for alert in db.list_seed_follow_alerts(limit=250):
         person_id = alert["discovered_person_id"]
         linkedin_enrichment = linkedin_enrichment_by_person_id.get(person_id) or {}
         x_handle = normalize_handle(alert.get("x_handle"))
@@ -866,7 +979,7 @@ def _frontend_data_payload() -> dict[str, Any]:
                     "eventType": "linkedin_interaction",
                     "headline": f"LinkedIn context added for {display_name}",
                     "description": linkedin_headline
-                    or "Make returned LinkedIn enrichment for this alert-qualified person.",
+                    or "LinkedIn enrichment added context for this alert-qualified person.",
                     "sourceUrl": linkedin_url or primary_profile_url,
                     "occurredAt": linkedin_enrichment.get("observed_at"),
                     "metadata": {
@@ -991,6 +1104,7 @@ def _frontend_data_payload() -> dict[str, Any]:
         "graphSource": graph_source,
         "appSettings": {
             "seedFollowAlertThreshold": alert_threshold,
+            "seedScan": seed_scan_summary,
         },
     }
 
@@ -1003,6 +1117,185 @@ def _twitter_payload() -> dict[str, Any]:
         "ok": True,
         "count": len(results),
         "results": _to_jsonable(results),
+    }
+
+
+def _seed_scan_latest_payload() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "scanStatus": _seed_scan_status(),
+        "scanSummary": _seed_scan_summary(),
+    }
+
+
+def _seed_follow_alerts_payload() -> dict[str, Any]:
+    from backend.db import SupabaseDB, normalize_handle
+
+    db = SupabaseDB.from_settings()
+    alert_threshold = db.get_seed_follow_alert_threshold()
+    linkedin_enrichment_by_person_id = db.list_latest_linkedin_enrichments_by_person()
+    alerts: list[dict[str, Any]] = []
+    for alert in db.list_seed_follow_alerts(limit=250):
+        person_id = alert["discovered_person_id"]
+        linkedin_enrichment = linkedin_enrichment_by_person_id.get(person_id) or {}
+        x_handle = normalize_handle(alert.get("x_handle"))
+        display_name = (alert.get("display_name") or (f"@{x_handle}" if x_handle else "Discovered person")).strip()
+        follower_count = int(alert.get("current_seed_follower_count") or 0)
+        primary_profile_url = alert.get("primary_profile_url") or (f"https://x.com/{x_handle}" if x_handle else "")
+        linkedin_url = alert.get("linkedin_url") or linkedin_enrichment.get("linkedin_url")
+        trigger_threshold = int(alert.get("trigger_threshold") or alert_threshold)
+        alerts.append(
+            {
+                "id": alert["id"],
+                "personId": person_id,
+                "displayName": display_name,
+                "xHandle": x_handle,
+                "primaryProfileUrl": primary_profile_url,
+                "githubUrl": alert.get("github_url"),
+                "linkedinUrl": linkedin_url,
+                "linkedinHeadline": linkedin_enrichment.get("headline"),
+                "linkedinRoleTitle": linkedin_enrichment.get("role_title"),
+                "linkedinCompany": linkedin_enrichment.get("company"),
+                "linkedinLocation": linkedin_enrichment.get("location"),
+                "linkedinEnrichedAt": linkedin_enrichment.get("observed_at"),
+                "triggeredAt": alert.get("triggered_at"),
+                "alertThreshold": trigger_threshold,
+                "triggeringSeedAccounts": alert.get("triggering_seed_accounts") or [],
+                "seedFollowers": alert.get("seed_followers") or [],
+                "currentSeedFollowerCount": follower_count,
+                "status": alert.get("status") or "new",
+                "promotedVcId": alert.get("promoted_vc_id"),
+                "promotedAt": alert.get("promoted_at"),
+            }
+        )
+
+    return {
+        "ok": True,
+        "alerts": alerts,
+        "appSettings": {
+            "seedFollowAlertThreshold": alert_threshold,
+            "seedScan": _seed_scan_summary(db=db),
+        },
+    }
+
+
+def _run_twitter_worker(limit: int | None) -> None:
+    from backend.db import utc_now
+    from backend.main import run_twitter
+
+    def update_progress(event: dict[str, Any]) -> None:
+        with _SEED_SCAN_LOCK:
+            if "total" in event:
+                _SEED_SCAN_STATUS["total"] = int(event.get("total") or 0)
+            if "count" in event:
+                _SEED_SCAN_STATUS["count"] = int(event.get("count") or 0)
+            if "remaining" in event:
+                _SEED_SCAN_STATUS["remaining"] = max(0, int(event.get("remaining") or 0))
+            elif _SEED_SCAN_STATUS.get("total") is not None:
+                _SEED_SCAN_STATUS["remaining"] = max(
+                    0,
+                    int(_SEED_SCAN_STATUS.get("total") or 0) - int(_SEED_SCAN_STATUS.get("count") or 0),
+                )
+            if "currentAccount" in event:
+                _SEED_SCAN_STATUS["currentAccount"] = event.get("currentAccount")
+            if "currentHandle" in event:
+                _SEED_SCAN_STATUS["currentHandle"] = event.get("currentHandle")
+            if "lastCompletedAccount" in event:
+                _SEED_SCAN_STATUS["lastCompletedAccount"] = event.get("lastCompletedAccount")
+            if "failed" in event:
+                _SEED_SCAN_STATUS["failed"] = int(event.get("failed") or 0)
+            if "skipped" in event:
+                _SEED_SCAN_STATUS["skipped"] = int(event.get("skipped") or 0)
+
+    with _SEED_SCAN_LOCK:
+        _SEED_SCAN_STATUS.update(
+            {
+                "status": "running",
+                "startedAt": utc_now().isoformat(),
+                "completedAt": None,
+                "limit": limit,
+                "count": 0,
+                "total": limit or 0,
+                "remaining": limit or 0,
+                "currentAccount": None,
+                "currentHandle": None,
+                "lastCompletedAccount": None,
+                "failed": 0,
+                "skipped": 0,
+                "error": None,
+            }
+        )
+    try:
+        results = run_twitter(limit=limit, progress_callback=update_progress, include_tracked_people=False)
+        with _SEED_SCAN_LOCK:
+            total = int(_SEED_SCAN_STATUS.get("total") or len(results))
+            processed_count = max(int(_SEED_SCAN_STATUS.get("count") or 0), len(results))
+            _SEED_SCAN_STATUS.update(
+                {
+                    "status": "completed",
+                    "completedAt": utc_now().isoformat(),
+                    "count": processed_count,
+                    "total": total,
+                    "remaining": max(0, total - processed_count),
+                    "currentAccount": None,
+                    "currentHandle": None,
+                    "error": None,
+                }
+            )
+    except Exception as exc:  # pragma: no cover - defensive for local ops
+        logger.exception("Background seed scan failed")
+        with _SEED_SCAN_LOCK:
+            _SEED_SCAN_STATUS.update(
+                {
+                    "status": "error",
+                    "completedAt": utc_now().isoformat(),
+                    "currentAccount": None,
+                    "currentHandle": None,
+                    "error": str(exc),
+                }
+            )
+
+
+def _start_twitter_payload(body: dict[str, Any]) -> dict[str, Any]:
+    from backend.db import utc_now
+
+    limit = _parse_seed_scan_limit(body)
+    with _SEED_SCAN_LOCK:
+        if _SEED_SCAN_STATUS.get("status") == "running":
+            return {
+                "ok": True,
+                "status": "running",
+                "message": "Seed scan is already running.",
+                "scanStatus": dict(_SEED_SCAN_STATUS),
+                "scanSummary": _seed_scan_summary(),
+            }
+        _SEED_SCAN_STATUS.update(
+            {
+                "status": "queued",
+                "startedAt": utc_now().isoformat(),
+                "completedAt": None,
+                "limit": limit,
+                "count": 0,
+                "total": limit or 0,
+                "remaining": limit or 0,
+                "currentAccount": None,
+                "currentHandle": None,
+                "lastCompletedAccount": None,
+                "failed": 0,
+                "skipped": 0,
+                "error": None,
+            }
+        )
+
+    thread = threading.Thread(target=_run_twitter_worker, args=(limit,), name="anytrace-seed-scan", daemon=True)
+    thread.start()
+    return {
+        "ok": True,
+        "status": "running",
+        "message": f"Seed scan started for {limit} seed sources." if limit else "Seed scan started for all seed sources.",
+        "limit": limit,
+        "scanStatus": _seed_scan_status(),
+        "scanSummary": _seed_scan_summary(),
     }
 
 
@@ -1061,6 +1354,18 @@ def _pipeline_payload() -> dict[str, Any]:
     }
 
 
+def _triage_latest_payload() -> dict[str, Any]:
+    from backend.engine.triage_engine import TriageEngine
+
+    return TriageEngine.build().latest_payload()
+
+
+def _triage_run_payload() -> dict[str, Any]:
+    from backend.engine.triage_engine import TriageEngine
+
+    return TriageEngine.build().run()
+
+
 def _run_linkedin_make_payload(body: dict[str, Any]) -> dict[str, Any]:
     from backend.config import get_settings
     from backend.db import SupabaseDB
@@ -1071,6 +1376,23 @@ def _run_linkedin_make_payload(body: dict[str, Any]) -> dict[str, Any]:
     limit_value = body.get("limit")
     limit = int(limit_value) if str(limit_value or "").strip() else None
     return trigger_linkedin_make(
+        settings=settings,
+        db=db,
+        limit=limit,
+        missing_only=_body_bool(body, "missingOnly", True),
+    )
+
+
+def _run_linkedin_enrichment_payload(body: dict[str, Any]) -> dict[str, Any]:
+    from backend.config import get_settings
+    from backend.db import SupabaseDB
+    from backend.scrapers.linkedin_alert_scraper import run_linkedin_alert_enrichment
+
+    settings = get_settings()
+    db = SupabaseDB.from_settings(settings)
+    limit_value = body.get("limit")
+    limit = int(limit_value) if str(limit_value or "").strip() else None
+    return run_linkedin_alert_enrichment(
         settings=settings,
         db=db,
         limit=limit,
@@ -1112,6 +1434,19 @@ def _update_app_settings_payload(body: dict[str, Any]) -> dict[str, Any]:
             "seedFollowAlertThreshold": threshold,
         },
         "backfillStats": backfill_stats,
+    }
+
+
+def _app_settings_payload() -> dict[str, Any]:
+    from backend.db import SupabaseDB
+
+    db = SupabaseDB.from_settings()
+    return {
+        "ok": True,
+        "appSettings": {
+            "seedFollowAlertThreshold": db.get_seed_follow_alert_threshold(),
+            "seedScan": _seed_scan_summary(db=db),
+        },
     }
 
 
@@ -1344,7 +1679,7 @@ def _add_tracked_person_payload(body: dict[str, Any]) -> dict[str, Any]:
 
 class AnytraceApiHandler(BaseHTTPRequestHandler):
     routes: dict[str, Callable[[], dict[str, Any]]] = {
-        "/health": lambda: {"ok": True, "service": "anytrace-api"},
+        "/health": _health_payload,
         "/frontend-data": _frontend_data_payload,
         "/run-twitter": _twitter_payload,
         "/run-github": _github_payload,
@@ -1352,6 +1687,10 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
         "/reset-activities": _reset_activities_payload,
         "/run-identity-match": _identity_payload,
         "/run-pipeline": _pipeline_payload,
+        "/triage/latest": _triage_latest_payload,
+        "/seed-scan/latest": _seed_scan_latest_payload,
+        "/seed-follow-alerts": _seed_follow_alerts_payload,
+        "/settings": _app_settings_payload,
     }
 
     def _set_headers(self, status_code: int = 200) -> None:
@@ -1395,7 +1734,7 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
             return
 
         route = self.routes.get(path)
-        if route is None or path not in {"/health", "/twitter-state", "/frontend-data"}:
+        if route is None or path not in {"/health", "/twitter-state", "/frontend-data", "/triage/latest", "/seed-scan/latest", "/seed-follow-alerts", "/settings"}:
             self._write_json({"ok": False, "error": "Not found"}, 404)
             return
         try:
@@ -1417,6 +1756,16 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
                 body = json.loads(raw_body.decode("utf-8"))
         body_dict = body if isinstance(body, dict) else {}
 
+        if path == "/run-twitter":
+            try:
+                payload = _start_twitter_payload(body_dict)
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200)
+            return
+
         if path == "/run-linkedin-make":
             try:
                 payload = _run_linkedin_make_payload(body_dict)
@@ -1425,6 +1774,26 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
                 self._write_json({"ok": False, "error": str(exc)}, 500)
                 return
             self._write_json(payload, 200)
+            return
+
+        if path == "/run-linkedin-enrichment":
+            try:
+                payload = _run_linkedin_enrichment_payload(body_dict)
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200 if payload.get("ok", True) else 500)
+            return
+
+        if path == "/triage/run":
+            try:
+                payload = _triage_run_payload()
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200 if payload.get("ok", True) else 502)
             return
 
         if path in {"/linkedin-make/ingest", "/ingest-linkedin-make"}:

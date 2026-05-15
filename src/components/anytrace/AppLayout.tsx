@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
   Settings,
   Menu,
   Network,
   Activity,
-  Bell,
+  Sparkles,
   Users,
   PanelLeftClose,
   PanelLeftOpen,
@@ -19,13 +18,13 @@ import { AccessBadge } from "@/components/anytrace/AccessBadge";
 type NavItem = {
   to: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: typeof Sparkles;
 };
 
 const nav: NavItem[] = [
-  { to: "/", label: "Inbox", icon: Bell },
+  { to: "/triage", label: "Founder Pipeline", icon: Sparkles },
+  { to: "/activities", label: "Source History", icon: Activity },
   { to: "/graph", label: "Graph", icon: Network },
-  { to: "/activities", label: "Alerts", icon: Activity },
   { to: "/watchlist", label: "Watchlist", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -127,7 +126,7 @@ export default function AppLayout() {
             {!sidebarCollapsed ? (
               <div className="rounded-2xl border border-sidebar-border bg-background/70 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.22em] text-sidebar-foreground/60">Status</div>
-                <div className="mt-2 text-sm text-sidebar-foreground">Alert inbox active, backend data loaded.</div>
+                <div className="mt-2 text-sm text-sidebar-foreground">Founder pipeline ready. Evidence loaded.</div>
               </div>
             ) : (
               <div className="flex justify-center">

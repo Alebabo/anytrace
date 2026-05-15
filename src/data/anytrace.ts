@@ -22,6 +22,42 @@ export type SyncStatus = "idle" | "pending" | "ok" | "error";
 
 export interface AnytraceAppSettings {
   seedFollowAlertThreshold: number;
+  seedScan?: SeedScanSummary | null;
+}
+
+export interface SeedScanSummary {
+  latestRunAt?: string | null;
+  latestSnapshotAt?: string | null;
+  snapshotCount: number;
+  scannedSeedCount?: number | null;
+  observationCount: number;
+  alertCount: number;
+  latestAlertAt?: string | null;
+}
+
+export interface SeedScanStatus {
+  status: "idle" | "queued" | "running" | "completed" | "error";
+  startedAt?: string | null;
+  completedAt?: string | null;
+  limit?: number | null;
+  count?: number;
+  total?: number;
+  remaining?: number;
+  currentAccount?: string | null;
+  currentHandle?: string | null;
+  lastCompletedAccount?: string | null;
+  failed?: number;
+  skipped?: number;
+  error?: string | null;
+}
+
+export interface SeedScanRun {
+  ok?: boolean;
+  status: SeedScanStatus["status"];
+  message?: string;
+  limit?: number;
+  scanStatus?: SeedScanStatus;
+  scanSummary?: SeedScanSummary;
 }
 
 export interface ViewerAccessState {
@@ -223,6 +259,155 @@ export interface SeedFollowPromotionDraft {
   clusterName: string;
   accountType: VcAccountType;
   tier: VcTier;
+}
+
+export type TriageCategory = "active_founder" | "potential_founder" | "company_no_raise_yet";
+export type TriageDecision = "reach_out_now" | "research_more" | "watch" | "discard";
+export type TriageStatus = "empty" | "completed" | "error";
+
+export interface TriageEvidence {
+  type: string;
+  label: string;
+  source?: string | null;
+  observedAt?: string | null;
+}
+
+export interface TriageAgentLogEntry {
+  stage: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface TriageGithubRepo {
+  repoLabel?: string | null;
+  repoUrl?: string | null;
+  description?: string | null;
+  language?: string | null;
+  stars?: number | null;
+  forks?: number | null;
+  watchers?: number | null;
+  starDelta7d?: number | null;
+  starDelta30d?: number | null;
+  snapshotDate?: string | null;
+  pushedAt?: string | null;
+}
+
+export interface TriageGithubEvent {
+  eventType?: string | null;
+  title?: string | null;
+  repoLabel?: string | null;
+  scoreImpact?: number | null;
+  sourceUrl?: string | null;
+  occurredAt?: string | null;
+}
+
+export interface TriageGithubContext {
+  handle?: string | null;
+  profileUrl?: string | null;
+  avatarUrl?: string | null;
+  accountType?: string | null;
+  bio?: string | null;
+  company?: string | null;
+  location?: string | null;
+  blogUrl?: string | null;
+  followers?: number | null;
+  publicRepos?: number | null;
+  indicatorCount?: number | null;
+  builderSignal?: string | null;
+  topRepos?: TriageGithubRepo[];
+  events?: TriageGithubEvent[];
+}
+
+export interface TriageCandidate {
+  id: string;
+  personId: string;
+  displayName: string;
+  xHandle?: string | null;
+  xAvatarUrl?: string | null;
+  avatarUrl?: string | null;
+  primaryProfileUrl?: string | null;
+  xBio?: string | null;
+  xPublicFollowerCount?: number | null;
+  xVerified?: boolean | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  linkedinHeadline?: string | null;
+  linkedinRoleTitle?: string | null;
+  linkedinCompany?: string | null;
+  linkedinLocation?: string | null;
+  githubContext?: TriageGithubContext | null;
+  triggeredAt?: string | null;
+  threshold: number;
+  qualified: boolean;
+  currentSeedFollowerCount: number;
+  triggeringSeedAccounts?: SeedFollowerAccount[];
+  seedFollowers?: SeedFollowerAccount[];
+  evidence: TriageEvidence[];
+}
+
+export interface TriageResult {
+  rank: number;
+  candidateId: string;
+  personId?: string | null;
+  displayName: string;
+  xHandle?: string | null;
+  xAvatarUrl?: string | null;
+  avatarUrl?: string | null;
+  primaryProfileUrl?: string | null;
+  xBio?: string | null;
+  xPublicFollowerCount?: number | null;
+  linkedinUrl?: string | null;
+  linkedinHeadline?: string | null;
+  linkedinRoleTitle?: string | null;
+  linkedinCompany?: string | null;
+  linkedinLocation?: string | null;
+  githubUrl?: string | null;
+  githubContext?: TriageGithubContext | null;
+  category: TriageCategory;
+  decision: TriageDecision;
+  score: number;
+  confidence: number;
+  overview?: string | null;
+  whyNow: string;
+  missingContext: string[];
+  riskFlags: string[];
+  nextAction: string;
+  evidence: TriageEvidence[];
+  currentSeedFollowerCount: number;
+}
+
+export interface TriageRun {
+  ok?: boolean;
+  runId?: string;
+  status: TriageStatus;
+  provider?: string;
+  model?: string | null;
+  mode?: "live" | "mock";
+  threshold: number;
+  candidateCount?: number;
+  candidateLimit?: number;
+  scannedCandidateCount?: number;
+  qualifiedCount?: number;
+  rawCandidates: TriageCandidate[];
+  results: TriageResult[];
+  agentLog: TriageAgentLogEntry[];
+  startedAt?: string | null;
+  completedAt?: string | null;
+  error?: string | null;
+}
+
+export interface LinkedInEnrichmentRun {
+  ok?: boolean;
+  status: string;
+  processed: number;
+  enriched: number;
+  skipped: number;
+  message?: string;
+  errors?: Array<Record<string, unknown>>;
+  enrichedProfiles?: Array<Record<string, unknown>>;
+  skippedProfiles?: Array<Record<string, unknown>>;
+  agent_log?: TriageAgentLogEntry[];
+  agentLog?: TriageAgentLogEntry[];
 }
 
 export interface WatchlistPerson extends TrackedPerson {

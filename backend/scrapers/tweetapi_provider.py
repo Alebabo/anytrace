@@ -53,6 +53,7 @@ class TweetApiFollowingProvider:
         output_file: str,
         last_known_handle: str | None,
         baseline_run: bool,
+        known_sequence: list[str] | None = None,
     ) -> TweetApiFetchResult:
         rows: list[dict[str, str]] = []
         seen_handles: set[str] = set()
@@ -60,6 +61,15 @@ class TweetApiFollowingProvider:
         stopped_early = False
         user_id = self._lookup_user_id(target_account)
         incremental_min_pages = max(1, self.settings.tweetapi_incremental_min_pages)
+        sequence_stop_count = max(0, self.settings.tweetapi_known_sequence_stop_count)
+        known_positions = {
+            handle: index
+            for index, raw_handle in enumerate(known_sequence or [])
+            if (handle := normalize_handle(raw_handle))
+        }
+        sequence_match_count = 0
+        next_known_sequence_index: int | None = None
+        known_sequence_threshold_reached = False
 
         for page_index in range(self.settings.tweetapi_max_pages):
             response = self._request(
@@ -76,6 +86,7 @@ class TweetApiFollowingProvider:
                 raise RuntimeError("TweetAPI response did not contain a followings list")
 
             page_found_known_handle = False
+            page_found_known_sequence = False
             for item in followings:
                 handle = self._extract_handle(item)
                 if not handle or handle in seen_handles:
@@ -83,20 +94,34 @@ class TweetApiFollowingProvider:
 
                 seen_handles.add(handle)
                 is_known_handle = bool(last_known_handle and handle == last_known_handle)
+                known_index = known_positions.get(handle)
+                if sequence_stop_count > 0 and known_index is not None:
+                    if next_known_sequence_index is not None and known_index == next_known_sequence_index:
+                        sequence_match_count += 1
+                    else:
+                        sequence_match_count = 1
+                    next_known_sequence_index = known_index + 1
+                elif sequence_stop_count > 0:
+                    sequence_match_count = 0
+                    next_known_sequence_index = None
+
                 rows.append(
                     {
                         "username": handle,
                         "name": str(item.get("name") or item.get("displayName") or ""),
                     }
                 )
+                if sequence_stop_count > 0 and sequence_match_count >= sequence_stop_count:
+                    page_found_known_sequence = True
+                    known_sequence_threshold_reached = True
+                    break
                 if is_known_handle:
                     page_found_known_handle = True
                     continue
 
             if (
                 not baseline_run
-                and last_known_handle
-                and page_found_known_handle
+                and (page_found_known_handle or page_found_known_sequence or known_sequence_threshold_reached)
                 and page_index + 1 >= incremental_min_pages
             ):
                 stopped_early = True

@@ -126,6 +126,33 @@ button {
     color 160ms ease;
 }
 
+.demo-corner-link {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 80;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(20, 49, 47, 0.18);
+  border-radius: 999px;
+  background: rgba(252, 251, 248, 0.92);
+  color: #14312f;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 16px 36px rgba(20, 49, 47, 0.14);
+  backdrop-filter: blur(16px);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.demo-corner-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(20, 49, 47, 0.34);
+  background: #ffffff;
+}
+
 .button:hover,
 .header-cta:hover {
   transform: translateY(-1px);

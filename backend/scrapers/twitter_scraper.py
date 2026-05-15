@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import csv
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, Callable
 
 from backend.config import Settings, get_settings, validate_settings
 from backend.db import SupabaseDB, normalize_handle, utc_now
@@ -40,6 +42,26 @@ class TwitterFollowingScraper:
         slug = normalize_handle(person.get("twitter_handle")) or person["id"]
         return str(Path("backend") / "outputs" / f"following_git_{slug}.csv")
 
+    def _known_sequence_from_output(self, output_file: str) -> list[str]:
+        path = Path(output_file)
+        if not path.exists():
+            return []
+
+        handles: list[str] = []
+        seen: set[str] = set()
+        try:
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle):
+                    normalized = normalize_handle(row.get("username"))
+                    if not normalized or normalized in seen:
+                        continue
+                    seen.add(normalized)
+                    handles.append(normalized)
+        except OSError:
+            logger.warning("Could not read previous following order from %s", output_file)
+            return []
+        return handles
+
     def _should_run_deep_scan(self, cursor_row: dict | None, baseline_run: bool) -> bool:
         if baseline_run or not cursor_row:
             return False
@@ -74,6 +96,7 @@ class TwitterFollowingScraper:
         deep_scan = self._should_run_deep_scan(cursor_row, baseline_run)
         baseline_first_seen_at = date.today() - timedelta(days=8)
         output_file = self._output_path_for_vc(vc)
+        known_sequence = [] if baseline_run else self._known_sequence_from_output(output_file)
 
         logger.info(
             "Scraping following list for seed source %s (@%s), baseline=%s, deep_scan=%s",
@@ -88,6 +111,7 @@ class TwitterFollowingScraper:
             output_file=output_file,
             last_known_handle=None if deep_scan else last_known_handle,
             baseline_run=baseline_run,
+            known_sequence=known_sequence,
         )
         rows = fetch_result.rows
 
@@ -193,6 +217,7 @@ class TwitterFollowingScraper:
         deep_scan = self._should_run_deep_scan(cursor_row, baseline_run)
         baseline_first_seen_at = date.today() - timedelta(days=8)
         output_file = self._output_path_for_tracked_person(person)
+        known_sequence = [] if baseline_run else self._known_sequence_from_output(output_file)
 
         logger.info(
             "Scraping following list for tracked git person %s (@%s), baseline=%s, deep_scan=%s",
@@ -207,6 +232,7 @@ class TwitterFollowingScraper:
             output_file=output_file,
             last_known_handle=None if deep_scan else last_known_handle,
             baseline_run=baseline_run,
+            known_sequence=known_sequence,
         )
         rows = fetch_result.rows
 
@@ -266,32 +292,99 @@ class TwitterFollowingScraper:
             output_file=fetch_result.output_file,
         )
 
-    def run_all(self) -> list[TwitterRunResult]:
+    def run_all(
+        self,
+        limit: int | None = None,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+        include_tracked_people: bool = True,
+    ) -> list[TwitterRunResult]:
         results: list[TwitterRunResult] = []
         skipped_no_handle = 0
         failed = 0
+        seed_targets: list[dict] = []
         for vc in self.db.list_vcs():
             twitter_handle = normalize_handle(vc.get("twitter_handle"))
             if not twitter_handle:
                 logger.info("Skipping seed source %s because twitter_handle is empty.", vc["name"])
                 skipped_no_handle += 1
                 continue
+            seed_targets.append(vc)
+
+        if limit is not None:
+            seed_targets = seed_targets[:limit]
+            logger.info("Stopping seed scan after SEED_SCAN_BATCH_LIMIT=%s handled sources.", limit)
+
+        total_targets = len(seed_targets)
+        if progress_callback:
+            progress_callback(
+                {
+                    "event": "start",
+                    "total": total_targets,
+                    "count": 0,
+                    "remaining": total_targets,
+                    "skipped": skipped_no_handle,
+                }
+            )
+
+        for index, vc in enumerate(seed_targets, start=1):
+            twitter_handle = normalize_handle(vc.get("twitter_handle"))
+            if progress_callback:
+                progress_callback(
+                    {
+                        "event": "source_start",
+                        "total": total_targets,
+                        "count": len(results),
+                        "remaining": max(0, total_targets - len(results)),
+                        "currentAccount": vc["name"],
+                        "currentHandle": f"@{twitter_handle}" if twitter_handle else None,
+                    }
+                )
             try:
-                results.append(self.process_vc(vc))
+                result = self.process_vc(vc)
+                results.append(result)
+                if progress_callback:
+                    progress_callback(
+                        {
+                            "event": "source_complete",
+                            "total": total_targets,
+                            "count": len(results),
+                            "remaining": max(0, total_targets - len(results)),
+                            "currentAccount": None,
+                            "currentHandle": None,
+                            "lastCompletedAccount": result.vc_name,
+                            "failed": failed,
+                            "skipped": skipped_no_handle,
+                        }
+                    )
             except Exception:
                 failed += 1
                 logger.exception("Twitter scrape failed for seed source %s", vc["name"])
-        for person in self.db.list_tracked_git_people_with_twitter():
-            twitter_handle = normalize_handle(person.get("twitter_handle"))
-            if not twitter_handle:
-                logger.info("Skipping tracked git person %s because twitter_handle is empty.", person["name"])
-                skipped_no_handle += 1
-                continue
-            try:
-                results.append(self.process_tracked_person(person))
-            except Exception:
-                failed += 1
-                logger.exception("Twitter scrape failed for tracked git person %s", person["name"])
+                if progress_callback:
+                    progress_callback(
+                        {
+                            "event": "source_failed",
+                            "total": total_targets,
+                            "count": index,
+                            "remaining": max(0, total_targets - index),
+                            "currentAccount": None,
+                            "currentHandle": None,
+                            "lastCompletedAccount": vc["name"],
+                            "failed": failed,
+                            "skipped": skipped_no_handle,
+                        }
+                    )
+        if limit is None and include_tracked_people:
+            for person in self.db.list_tracked_git_people_with_twitter():
+                twitter_handle = normalize_handle(person.get("twitter_handle"))
+                if not twitter_handle:
+                    logger.info("Skipping tracked git person %s because twitter_handle is empty.", person["name"])
+                    skipped_no_handle += 1
+                    continue
+                try:
+                    results.append(self.process_tracked_person(person))
+                except Exception:
+                    failed += 1
+                    logger.exception("Twitter scrape failed for tracked git person %s", person["name"])
         logger.info(
             "Twitter scrape summary: %s succeeded, %s skipped without handle, %s failed.",
             len(results),
@@ -327,6 +420,7 @@ class TwitterFollowingScraper:
         output_file: str,
         last_known_handle: str | None,
         baseline_run: bool,
+        known_sequence: list[str] | None = None,
     ) -> TweetApiFetchResult:
         provider = self._provider_name()
         logger.info("Using twitter provider '%s' for @%s", provider, twitter_handle)
@@ -338,6 +432,7 @@ class TwitterFollowingScraper:
                 output_file=output_file,
                 last_known_handle=last_known_handle,
                 baseline_run=baseline_run,
+                known_sequence=known_sequence,
             )
 
         rows = scrape_following(

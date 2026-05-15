@@ -91,6 +91,27 @@ class LocalTwitterStateStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_twitter_summary(self) -> dict:
+        with self._connect() as connection:
+            snapshot_row = connection.execute(
+                """
+                select count(*) as snapshot_count, max(created_at) as latest_snapshot_at
+                from twitter_following_snapshots
+                """
+            ).fetchone()
+            cursor_row = connection.execute(
+                """
+                select count(*) as scanned_seed_count, max(last_run_at) as latest_run_at
+                from twitter_vc_cursors
+                """
+            ).fetchone()
+        return {
+            "snapshotCount": int(snapshot_row["snapshot_count"] or 0) if snapshot_row else 0,
+            "latestSnapshotAt": snapshot_row["latest_snapshot_at"] if snapshot_row else None,
+            "scannedSeedCount": int(cursor_row["scanned_seed_count"] or 0) if cursor_row else 0,
+            "latestRunAt": cursor_row["latest_run_at"] if cursor_row else None,
+        }
+
     def twitter_snapshot_exists(self, vc_id: str, followed_handle: str) -> bool:
         normalized_handle = normalize_handle(followed_handle)
         with self._connect() as connection:

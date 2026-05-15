@@ -12,6 +12,7 @@ class SeedFollowAlertPromotionTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db = SupabaseDB(Path(self.temp_dir.name) / "anytrace-test.db")
+        self.db.set_seed_follow_alert_threshold(2)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()

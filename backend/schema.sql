@@ -180,7 +180,7 @@ create table if not exists seed_follow_alert_events (
   discovered_person_id text references discovered_people(id) on delete cascade unique,
   triggered_at timestamptz default now(),
   triggering_seed_accounts jsonb default '[]'::jsonb,
-  trigger_threshold int default 2,
+  trigger_threshold int default 3,
   status text default 'new',
   promoted_vc_id uuid references vcs(id) on delete set null,
   promoted_at timestamptz,
@@ -202,7 +202,7 @@ create table if not exists linkedin_enrichment_events (
   role_title text,
   company text,
   location text,
-  source text default 'make',
+  source text default 'linkedin_native_scraper',
   raw_payload jsonb default '{}'::jsonb,
   observed_at timestamptz default now(),
   created_at timestamptz default now()
@@ -357,6 +357,22 @@ create table if not exists news_feed (
   score_impact int,
   created_at timestamptz default now()
 );
+
+create table if not exists triage_runs (
+  id uuid primary key default gen_random_uuid(),
+  status text not null,
+  threshold int not null default 3,
+  provider text not null default 'featherless',
+  model text,
+  candidate_count int default 0,
+  qualified_count int default 0,
+  error text,
+  payload jsonb default '{}'::jsonb,
+  started_at timestamptz default now(),
+  completed_at timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists triage_runs_created_at_idx on triage_runs(created_at desc);
 
 drop policy if exists "users can read own profile" on user_profiles;
 create policy "users can read own profile"

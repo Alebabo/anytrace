@@ -5,9 +5,14 @@ import type {
   AnytraceAppSettings,
   GithubSignalProfile,
   GraphData,
+  LinkedInEnrichmentRun,
   PersonIdentity,
+  SeedScanRun,
+  SeedScanSummary,
+  SeedScanStatus,
   SeedFollowAlert,
   SeedFollowPromotionDraft,
+  TriageRun,
   TrackedPerson,
   UserVcWatchlistItem,
   VcSource,
@@ -35,6 +40,8 @@ import {
   resetLocalWorkspace,
   shouldRetryBackendSnapshot,
 } from "@/lib/localData";
+import { demoPayload, getDemoLinkedInRun, getDemoTriageRun } from "@/lib/demoData";
+import { isAnytraceDemoMode } from "@/lib/demoMode";
 import {
   getAuthState,
   sendMagicLink,
@@ -58,6 +65,15 @@ function useStaticMutation<TInput = void, TOutput = void>(handler: (input: TInpu
 }
 
 function anytraceQueryOptions() {
+  if (isAnytraceDemoMode()) {
+    return {
+      staleTime: Number.POSITIVE_INFINITY,
+      refetchOnMount: false as const,
+      refetchOnWindowFocus: false,
+      refetchInterval: false as const,
+    };
+  }
+
   return {
     staleTime: 30_000,
     refetchOnMount: "always" as const,
@@ -67,7 +83,12 @@ function anytraceQueryOptions() {
 }
 
 function getBackendBaseUrl() {
-  return import.meta.env.VITE_ANYTRACE_BACKEND_URL?.trim() || "http://127.0.0.1:8766";
+  const configured = import.meta.env.VITE_ANYTRACE_BACKEND_URL?.trim();
+  if (!configured) return "http://127.0.0.1:8767";
+  if (configured === "http://127.0.0.1:8766" || configured === "http://localhost:8766") {
+    return "http://127.0.0.1:8767";
+  }
+  return configured;
 }
 
 function mapVcsToWatchlistItems(vcs: VcSource[]): UserVcWatchlistItem[] {
@@ -89,7 +110,7 @@ export function useSession() {
 }
 
 export function useDemoMode() {
-  return false;
+  return isAnytraceDemoMode();
 }
 
 export function useAccessState() {
@@ -107,7 +128,7 @@ export function useAccessState() {
     loading: false,
     access,
     subscription: null,
-    demoMode: false,
+    demoMode: isAnytraceDemoMode(),
   };
 }
 
@@ -146,57 +167,179 @@ export function useRunTwitterScrape() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async () => {
+    if (isAnytraceDemoMode()) {
+      await queryClient.invalidateQueries({ queryKey: ["anytrace", "seed-scan"] });
+      return {
+        ok: true,
+        status: "completed" as const,
+        message: "Demo mode uses a preloaded static seed-follow snapshot.",
+        scanStatus: {
+          status: "completed" as const,
+          startedAt: demoPayload.appSettings.seedScan?.latestRunAt ?? null,
+          completedAt: demoPayload.appSettings.seedScan?.latestRunAt ?? null,
+          limit: null,
+          count: demoPayload.seedFollowAlerts.length,
+          total: demoPayload.seedFollowAlerts.length,
+          remaining: 0,
+          currentAccount: null,
+          currentHandle: null,
+          lastCompletedAccount: null,
+          failed: 0,
+          skipped: 0,
+          error: null,
+        },
+        scanSummary: demoPayload.appSettings.seedScan ?? {
+          snapshotCount: demoPayload.graphEdges.length,
+          observationCount: demoPayload.graphEdges.length,
+          alertCount: demoPayload.seedFollowAlerts.length,
+        },
+      } satisfies SeedScanRun;
+    }
+
     const response = await fetch(`${getBackendBaseUrl()}/run-twitter`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ limit: "all" }),
     });
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-      count?: number;
-    };
+    const payload = (await response.json().catch(() => ({}))) as SeedScanRun & { error?: string };
 
     if (!response.ok || payload.ok === false) {
       throw new Error(payload.error || "Seed-follow scan could not be started. Start the local API with `python -m backend.main serve-api`.");
     }
 
-    clearSignalCaches();
-    await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
-    await queryClient.refetchQueries({ queryKey: ["anytrace"], type: "active" });
+    await queryClient.invalidateQueries({ queryKey: ["anytrace", "seed-scan"] });
     return payload;
   });
 }
 
 export function useTwitterScrapeEndpoint() {
+  if (isAnytraceDemoMode()) return "Demo mode";
   return `${getBackendBaseUrl()}/run-twitter`;
 }
 
-export function useRunLinkedInMakeEnrichment() {
+export function useSeedScanStatus(_enabled = true) {
+  return useQuery({
+    queryKey: ["anytrace", "seed-scan", "latest"],
+    queryFn: async () => {
+      if (isAnytraceDemoMode()) {
+        return {
+          ok: true,
+          scanStatus: {
+            status: "completed" as const,
+            startedAt: demoPayload.appSettings.seedScan?.latestRunAt ?? null,
+            completedAt: demoPayload.appSettings.seedScan?.latestRunAt ?? null,
+            limit: null,
+            count: demoPayload.seedFollowAlerts.length,
+            total: demoPayload.seedFollowAlerts.length,
+            remaining: 0,
+            currentAccount: null,
+            currentHandle: null,
+            lastCompletedAccount: null,
+            failed: 0,
+            skipped: 0,
+            error: null,
+          },
+          scanSummary: demoPayload.appSettings.seedScan ?? {
+            snapshotCount: demoPayload.graphEdges.length,
+            observationCount: demoPayload.graphEdges.length,
+            alertCount: demoPayload.seedFollowAlerts.length,
+          },
+        };
+      }
+
+      const response = await fetch(`${getBackendBaseUrl()}/seed-scan/latest`);
+      return readJsonPayload<{
+        ok?: boolean;
+        scanStatus: SeedScanStatus;
+        scanSummary: SeedScanSummary;
+      }>(response, "Latest seed scan could not be loaded.");
+    },
+    enabled: _enabled,
+    staleTime: 5_000,
+    refetchInterval: (query) => (query.state.data?.scanStatus?.status === "running" || query.state.data?.scanStatus?.status === "queued" ? 5_000 : false),
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+  });
+}
+
+async function readJsonPayload<T>(response: Response, fallbackError: string): Promise<T> {
+  const payload = (await response.json().catch(() => ({}))) as T & { error?: string; ok?: boolean };
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || fallbackError);
+  }
+  return payload as T;
+}
+
+export function useLatestTriageRun(_enabled = true) {
+  return useQuery({
+    queryKey: ["anytrace", "triage", "latest"],
+    queryFn: async () => {
+      if (isAnytraceDemoMode()) {
+        return getDemoTriageRun();
+      }
+
+      const response = await fetch(`${getBackendBaseUrl()}/triage/latest`);
+      return readJsonPayload<TriageRun>(response, "Latest Anytrace.ai triage run could not be loaded.");
+    },
+    enabled: _enabled,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useRunTriage() {
+  const queryClient = useQueryClient();
+
+  return useStaticMutation(async () => {
+    if (isAnytraceDemoMode()) {
+      const payload = getDemoTriageRun();
+      void queryClient.invalidateQueries({ queryKey: ["anytrace", "triage"] });
+      return payload;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 120_000);
+    const response = await fetch(`${getBackendBaseUrl()}/triage/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+      signal: controller.signal,
+    }).finally(() => window.clearTimeout(timeoutId));
+    const payload = await readJsonPayload<TriageRun>(response, "Anytrace.ai triage could not be completed.");
+    void queryClient.invalidateQueries({ queryKey: ["anytrace", "triage"] });
+    void queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+    return payload;
+  });
+}
+
+export function useRunLinkedInEnrichment() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async (input?: { limit?: number; missingOnly?: boolean }) => {
-    const response = await fetch(`${getBackendBaseUrl()}/run-linkedin-make`, {
+    if (isAnytraceDemoMode()) {
+      const payload = getDemoLinkedInRun();
+      await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+      return payload;
+    }
+
+    const response = await fetch(`${getBackendBaseUrl()}/run-linkedin-enrichment`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        limit: input?.limit ?? 25,
+        limit: input?.limit,
         missingOnly: input?.missingOnly ?? true,
       }),
     });
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      error?: string;
-      sent?: number;
-      status?: string;
-      message?: string;
-    };
+    const payload = (await response.json().catch(() => ({}))) as LinkedInEnrichmentRun & { error?: string };
 
     if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || "LinkedIn Make enrichment could not be started. Check MAKE_LINKEDIN_WEBHOOK_URL.");
+      throw new Error(payload.error || payload.message || "Native LinkedIn enrichment could not be started. Check LI_USERNAME and LI_PASSWORD.");
     }
 
     clearSignalCaches();
@@ -206,8 +349,9 @@ export function useRunLinkedInMakeEnrichment() {
   });
 }
 
-export function useLinkedInMakeEndpoint() {
-  return `${getBackendBaseUrl()}/run-linkedin-make`;
+export function useLinkedInEnrichmentEndpoint() {
+  if (isAnytraceDemoMode()) return "Demo mode";
+  return `${getBackendBaseUrl()}/run-linkedin-enrichment`;
 }
 
 export function useRunGithubScan() {
@@ -259,7 +403,22 @@ export function useRefreshAnytraceData() {
 export function useAppSettings(_enabled = true) {
   return useQuery({
     queryKey: ["anytrace", "app-settings"],
-    queryFn: fetchAppSettings,
+    queryFn: async () => {
+      if (isAnytraceDemoMode()) {
+        return fetchAppSettings();
+      }
+
+      try {
+        const response = await fetch(`${getBackendBaseUrl()}/settings`);
+        const payload = await readJsonPayload<{ ok?: boolean; appSettings: AnytraceAppSettings }>(
+          response,
+          "App settings could not be loaded.",
+        );
+        return payload.appSettings;
+      } catch {
+        return fetchAppSettings();
+      }
+    },
     enabled: _enabled,
     ...anytraceQueryOptions(),
   });
@@ -272,6 +431,17 @@ export function useUpdateAppSettings() {
     const threshold = input.seedFollowAlertThreshold;
     if (!Number.isFinite(threshold)) {
       throw new Error("Please enter a valid threshold.");
+    }
+
+    if (isAnytraceDemoMode()) {
+      return {
+        ok: true,
+        appSettings: {
+          ...demoPayload.appSettings,
+          seedFollowAlertThreshold: threshold,
+        },
+        backfillStats: { alertsCreated: 0 },
+      };
     }
 
     const response = await fetch(`${getBackendBaseUrl()}/settings`, {
@@ -328,6 +498,18 @@ export function useAddVcToWatchlist() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async (draft: VcSourceDraft) => {
+    if (isAnytraceDemoMode()) {
+      const vc = await addLocalVc({
+        name: draft.name,
+        linkedinUrl: draft.linkedinUrl,
+        xHandle: draft.xHandle || draft.twitterUrl,
+        tier: draft.tier,
+        accountType: draft.accountType,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+      return { ok: true, vc };
+    }
+
     let vc: unknown = null;
     let backendUnavailable = false;
 
@@ -448,7 +630,22 @@ export function useWeeklyPicks(_enabled = true) {
 export function useSeedFollowAlerts(_enabled = true) {
   return useQuery({
     queryKey: ["anytrace", "seed-follow-alerts"],
-    queryFn: fetchSeedFollowAlerts,
+    queryFn: async () => {
+      if (isAnytraceDemoMode()) {
+        return fetchSeedFollowAlerts();
+      }
+
+      try {
+        const response = await fetch(`${getBackendBaseUrl()}/seed-follow-alerts`);
+        const payload = await readJsonPayload<{ ok?: boolean; alerts: SeedFollowAlert[] }>(
+          response,
+          "Seed-follow alerts could not be loaded.",
+        );
+        return payload.alerts;
+      } catch {
+        return fetchSeedFollowAlerts();
+      }
+    },
     enabled: _enabled,
     ...anytraceQueryOptions(),
   });
@@ -458,6 +655,11 @@ export function usePromoteSeedFollowAlert() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async (input: SeedFollowPromotionDraft) => {
+    if (isAnytraceDemoMode()) {
+      await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+      return { ok: true, alertId: input.alertId };
+    }
+
     const response = await fetch(`${getBackendBaseUrl()}/seed-follow-alerts/promote-to-seed`, {
       method: "POST",
       headers: {
@@ -485,6 +687,11 @@ export function useUpdateSeedFollowAlertStatus() {
   const queryClient = useQueryClient();
 
   return useStaticMutation(async (input: { alertId: string; status: "new" | "seen" | "liked" | "archived" }) => {
+    if (isAnytraceDemoMode()) {
+      await queryClient.invalidateQueries({ queryKey: ["anytrace"] });
+      return { ok: true, ...input };
+    }
+
     const response = await fetch(`${getBackendBaseUrl()}/seed-follow-alerts/status`, {
       method: "POST",
       headers: {

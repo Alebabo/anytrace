@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "@/components/anytrace/AppLayout";
 
 const MainDashboard = lazy(() => import("@/pages/Index"));
+const TriagePage = lazy(() => import("@/pages/Triage"));
 const GraphPage = lazy(() => import("@/pages/Explore"));
 const ActivitiesPage = lazy(() => import("@/pages/Activities"));
 const WatchlistPage = lazy(() => import("@/pages/Watchlist"));
@@ -45,11 +46,13 @@ const App = () => (
         <Suspense fallback={<AppFallback />}>
           <Routes>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<MainDashboard />} />
+              <Route path="/" element={<Navigate to="/triage" replace />} />
+              <Route path="/seed-scan" element={<MainDashboard />} />
+              <Route path="/triage" element={<TriagePage />} />
               <Route path="/graph" element={<GraphPage />} />
               <Route path="/activities" element={<ActivitiesPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
-              <Route path="/top-picks" element={<Navigate to="/activities?filter=top-picks" replace />} />
+              <Route path="/top-picks" element={<Navigate to="/triage" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/connections/:id" element={<ConnectionDetail />} />
             </Route>

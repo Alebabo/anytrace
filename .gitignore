@@ -9,11 +9,16 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-demo
 dist-ssr
 *.local
+.env
 .venv
 __pycache__/
 *.pyc
+backend/outputs/
+output/
+test-results/
 
 # Editor directories and files
 .vscode/*

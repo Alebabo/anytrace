@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { ArrowUpRight, Bell, Clock, Eye, Linkedin, RefreshCw, Trash2, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ProductGate } from "@/components/anytrace/ProductGate";
@@ -8,7 +9,8 @@ import {
   useAccessState,
   useAppSettings,
   useRefreshAnytraceData,
-  useRunLinkedInMakeEnrichment,
+  useRunLinkedInEnrichment,
+  useSeedScanStatus,
   useRunTwitterScrape,
   useSeedFollowAlerts,
   useUpdateSeedFollowAlertStatus,
@@ -131,24 +133,39 @@ export default function MainDashboard() {
   const alertsQuery = useSeedFollowAlerts(access.isAuthenticated);
   const refreshData = useRefreshAnytraceData();
   const runSeedScan = useRunTwitterScrape();
-  const runLinkedInEnrichment = useRunLinkedInMakeEnrichment();
+  const seedScanStatusQuery = useSeedScanStatus(access.isAuthenticated);
+  const runLinkedInEnrichment = useRunLinkedInEnrichment();
   const updateAlertStatus = useUpdateSeedFollowAlertStatus();
-  const activeThreshold = appSettings.data?.seedFollowAlertThreshold ?? 2;
-  const alerts = [...(alertsQuery.data ?? [])]
-    .filter(isVisibleSeedFollowAlert)
+  const seedScanStatus = seedScanStatusQuery.data?.scanStatus;
+  const seedScanSummary = seedScanStatusQuery.data?.scanSummary ?? appSettings.data?.seedScan ?? null;
+  const seedScanRunning = seedScanStatus?.status === "queued" || seedScanStatus?.status === "running";
+  const previousSeedScanStatus = useRef(seedScanStatus?.status);
+
+  useEffect(() => {
+    const previous = previousSeedScanStatus.current;
+    const current = seedScanStatus?.status;
+    if ((previous === "queued" || previous === "running") && current === "completed") {
+      refreshData.mutate();
+    }
+    previousSeedScanStatus.current = current;
+  }, [refreshData, seedScanStatus?.status]);
+
+  const visibleAlerts = [...(alertsQuery.data ?? [])].filter(isVisibleSeedFollowAlert);
+  const activeThreshold = appSettings.data?.seedFollowAlertThreshold ?? visibleAlerts[0]?.alertThreshold ?? 3;
+  const alerts = visibleAlerts
     .filter((alert) => alert.currentSeedFollowerCount >= activeThreshold)
     .sort((left, right) => new Date(right.triggeredAt || 0).getTime() - new Date(left.triggeredAt || 0).getTime());
   const seedAccountCount = new Set(alerts.flatMap((alert) => alert.seedFollowers.map((account) => account.id))).size;
   const newCount = alerts.filter((alert) => alert.status === "new").length;
 
   return (
-    <ProductGate title="Alert Inbox">
+    <ProductGate title="Seed Scan">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               <Bell className="h-3.5 w-3.5" />
-              Seed-source Alert Inbox
+              Seed-source scan
             </div>
             <h1 className="text-3xl font-medium md:text-4xl">
               People crossing the {activeThreshold}-seed-follow threshold
@@ -161,18 +178,18 @@ export default function MainDashboard() {
             <Button
               type="button"
               className="w-full rounded-md sm:w-auto"
-              disabled={runSeedScan.isPending}
+              disabled={runSeedScan.isPending || seedScanRunning}
               onClick={() => runSeedScan.mutate()}
             >
-              <RefreshCw className={`h-4 w-4 ${runSeedScan.isPending ? "animate-spin" : ""}`} />
-              Run seed scan
+              <RefreshCw className={`h-4 w-4 ${runSeedScan.isPending || seedScanRunning ? "animate-spin" : ""}`} />
+              {seedScanRunning ? "Seed scan running" : "Run seed scan"}
             </Button>
             <Button
               type="button"
               variant="outline"
               className="w-full rounded-md sm:w-auto"
               disabled={runLinkedInEnrichment.isPending}
-              onClick={() => runLinkedInEnrichment.mutate({ limit: 25, missingOnly: true })}
+              onClick={() => runLinkedInEnrichment.mutate({ missingOnly: true })}
             >
               <Linkedin className={`h-4 w-4 ${runLinkedInEnrichment.isPending ? "animate-pulse" : ""}`} />
               Enrich LinkedIn
@@ -196,23 +213,44 @@ export default function MainDashboard() {
           </div>
         ) : null}
 
+        {runSeedScan.isSuccess && runSeedScan.data ? (
+          <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {runSeedScan.data.message || "Seed scan started."} The latest completed scan remains preloaded while the new batch runs.
+          </div>
+        ) : null}
+
+        {seedScanStatus?.status === "error" ? (
+          <div className="mb-5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {seedScanStatus.error || "Latest seed scan failed."}
+          </div>
+        ) : null}
+
         {runLinkedInEnrichment.isError ? (
           <div className="mb-5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {(runLinkedInEnrichment.error as Error)?.message || "LinkedIn Make enrichment could not be started."}
+            {(runLinkedInEnrichment.error as Error)?.message || "Native LinkedIn enrichment could not be started."}
           </div>
         ) : null}
 
         {runLinkedInEnrichment.isSuccess && runLinkedInEnrichment.data ? (
           <div className="mb-5 rounded-lg border border-signal-linkedin/25 bg-signal-linkedin/5 px-4 py-3 text-sm text-muted-foreground">
-            {runLinkedInEnrichment.data.sent
-              ? `Sent ${runLinkedInEnrichment.data.sent} alert-qualified profiles to the Make LinkedIn workflow.`
-              : runLinkedInEnrichment.data.message || "No alert-qualified profiles need LinkedIn enrichment right now."}
+            {runLinkedInEnrichment.data.enriched > 0
+              ? `Native LinkedIn scraper enriched ${runLinkedInEnrichment.data.enriched} of ${runLinkedInEnrichment.data.processed} selected profile${runLinkedInEnrichment.data.processed === 1 ? "" : "s"}. ${runLinkedInEnrichment.data.skipped ? `${runLinkedInEnrichment.data.skipped} skipped.` : ""}`
+              : runLinkedInEnrichment.data.message || "No source-qualified profiles need LinkedIn enrichment right now."}
+            {(runLinkedInEnrichment.data.agentLog || runLinkedInEnrichment.data.agent_log || []).length > 0 ? (
+              <div className="mt-3 space-y-1 border-t border-signal-linkedin/20 pt-3">
+                {(runLinkedInEnrichment.data.agentLog || runLinkedInEnrichment.data.agent_log || []).slice(-4).map((entry, index) => (
+                  <div key={`${entry.timestamp}-${index}`} className="font-mono text-xs text-muted-foreground">
+                    [{entry.stage}] {entry.message}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        <div className="mb-5 grid gap-3 md:grid-cols-3">
+        <div className="mb-5 grid gap-3 md:grid-cols-4">
           <div className="rounded-lg border border-border px-4 py-3">
-            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">New alerts</div>
+            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">New signals</div>
             <div className="mt-1 text-2xl font-medium">{newCount}</div>
           </div>
           <div className="rounded-lg border border-border px-4 py-3">
@@ -226,6 +264,17 @@ export default function MainDashboard() {
               {seedAccountCount}
             </div>
           </div>
+          <div className="rounded-lg border border-border px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Last seed scan</div>
+            <div className="mt-1 text-sm font-medium">
+              {seedScanRunning ? "Running now" : formatTime(seedScanSummary?.latestRunAt)}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {seedScanSummary
+                ? `${seedScanSummary.snapshotCount.toLocaleString()} follows, ${seedScanSummary.alertCount.toLocaleString()} source signals`
+                : "Loading latest scan"}
+            </div>
+          </div>
         </div>
 
         {alertsQuery.isLoading ? (
@@ -236,11 +285,11 @@ export default function MainDashboard() {
           </div>
         ) : alertsQuery.isError ? (
           <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-            {String(alertsQuery.error || "Alert inbox could not be loaded.")}
+            {String(alertsQuery.error || "Seed scan signals could not be loaded.")}
           </div>
         ) : alerts.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground">
-            No {activeThreshold}-seed-follow alerts yet. Run the X seed-account scraper to populate the inbox.
+            No {activeThreshold}-seed-follow signals yet. Run the X seed-account scraper to populate the source history.
           </div>
         ) : (
           <div className="space-y-3">

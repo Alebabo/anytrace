@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowUpRight, Bell, Clock, Heart, RotateCcw, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowUpRight, Clock, Heart, RotateCcw, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import { ProductGate } from "@/components/anytrace/ProductGate";
 import { SeedPromotionDialog } from "@/components/anytrace/SeedPromotionDialog";
 import { Button } from "@/components/ui/button";
@@ -103,7 +103,7 @@ function matchesFilter(alert: SeedFollowAlert, filter: AlertFilter, activeThresh
 function filterLabel(filter: AlertFilter, activeThreshold = 2) {
   switch (filter) {
     case "top-picks":
-      return "Top Picks";
+      return "Qualified";
     case "all":
       return "All";
     case "today":
@@ -154,8 +154,8 @@ function AlertLogRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">
-              {rank ? <Sparkles className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
-              {rank ? `#${rank}` : "Alert created"}
+              {rank ? <Sparkles className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+              {rank ? `#${rank}` : "Signal captured"}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
@@ -300,19 +300,19 @@ export default function ActivitiesPage() {
 
   return (
     <ProductGate
-      title="Alerts"
-      description={`Top picks and full seed-follow history. Current threshold: ${activeThreshold}.`}
+      title="Source History"
+      description={`Raw seed-follow history behind the founder pipeline. Current threshold: ${activeThreshold}.`}
     >
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-8 md:py-10">
         <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              <Bell className="h-3.5 w-3.5" />
-              Seed-follow alerts
+              <Clock className="h-3.5 w-3.5" />
+              Raw source signals
             </div>
-            <h1 className="text-3xl font-medium md:text-4xl">Top picks and alert history</h1>
+            <h1 className="text-3xl font-medium md:text-4xl">Seed-follow history</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Review the strongest current picks first, then drop into the full log when you need history.
+              Use this audit view only when you need the raw source trail behind the founder pipeline.
             </p>
           </div>
           <div className="rounded-lg border border-border px-4 py-3">
@@ -363,13 +363,13 @@ export default function ActivitiesPage() {
           </div>
         ) : alertsQuery.isError ? (
           <div className="rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground">
-            {String(alertsQuery.error || "Alert log could not be loaded.")}
+            {String(alertsQuery.error || "Source history could not be loaded.")}
           </div>
         ) : alerts.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground">
             {activeFilter === "top-picks"
-              ? `No active top picks at the ${activeThreshold}-seed threshold.`
-              : "No qualified alerts yet. Run the seed scan from the Inbox to start building this history."}
+              ? `No qualified source signals at the ${activeThreshold}-seed threshold.`
+              : "No qualified source signals yet. Run the agent pipeline or seed scan to start building this history."}
           </div>
         ) : (
           <div className="space-y-3">

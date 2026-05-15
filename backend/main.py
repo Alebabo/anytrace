@@ -15,9 +15,10 @@ from backend.db import SupabaseDB
 from backend.engine.identity_matcher import IdentityMatcher
 from backend.engine.news_engine import NewsEngine
 from backend.engine.score_engine import ScoreEngine
-from backend.linkedin_make import trigger_linkedin_make
+from backend.engine.triage_engine import TriageEngine
 from backend.scheduler import start_scheduler
 from backend.scrapers.github_scraper import GithubScraper
+from backend.scrapers.linkedin_alert_scraper import run_linkedin_alert_enrichment
 from backend.scrapers.twitter_scraper import TwitterFollowingScraper
 
 
@@ -39,8 +40,12 @@ def run_github():
     return results
 
 
-def run_twitter():
-    results = TwitterFollowingScraper().run_all()
+def run_twitter(limit: int | None = None, progress_callback=None, include_tracked_people: bool = True):
+    results = TwitterFollowingScraper().run_all(
+        limit=limit,
+        progress_callback=progress_callback,
+        include_tracked_people=include_tracked_people,
+    )
     logging.getLogger(__name__).info("Twitter run completed for %s seed sources", len(results))
     return results
 
@@ -52,8 +57,13 @@ def run_scores() -> None:
 
 
 def run_linkedin() -> dict:
-    result = trigger_linkedin_make()
-    logging.getLogger(__name__).info("LinkedIn Make run sent %s profiles", result.get("sent", 0))
+    result = run_linkedin_alert_enrichment()
+    logging.getLogger(__name__).info(
+        "Native LinkedIn enrichment completed with status=%s enriched=%s skipped=%s",
+        result.get("status"),
+        result.get("enriched", 0),
+        result.get("skipped", 0),
+    )
     return result
 
 
@@ -68,6 +78,16 @@ def run_identity_match():
     results = IdentityMatcher(db).run()
     logging.getLogger(__name__).info("Identity matching completed for %s tracked people", len(results))
     return results
+
+
+def run_triage() -> dict:
+    result = TriageEngine.build().run()
+    logging.getLogger(__name__).info(
+        "Anytrace.ai triage completed with status=%s qualified=%s",
+        result.get("status"),
+        result.get("qualifiedCount"),
+    )
+    return result
 
 
 def run_alerts() -> None:
@@ -93,8 +113,10 @@ def build_parser() -> argparse.ArgumentParser:
             "run-github",
             "run-scores",
             "run-linkedin",
+            "run-linkedin-enrichment",
             "run-news",
             "run-identity-match",
+            "run-triage",
             "run-alerts",
             "run-pipeline",
             "scheduler",
@@ -117,10 +139,14 @@ def main() -> None:
         run_scores()
     elif args.command == "run-linkedin":
         run_linkedin()
+    elif args.command == "run-linkedin-enrichment":
+        run_linkedin()
     elif args.command == "run-news":
         run_news()
     elif args.command == "run-identity-match":
         run_identity_match()
+    elif args.command == "run-triage":
+        run_triage()
     elif args.command == "run-alerts":
         run_alerts()
     elif args.command == "run-pipeline":

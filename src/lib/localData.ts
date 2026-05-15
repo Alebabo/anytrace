@@ -11,6 +11,8 @@ import type {
   VcSource,
   WeeklyPick,
 } from "@/data/anytrace";
+import { demoPayload } from "@/lib/demoData";
+import { isAnytraceDemoMode } from "@/lib/demoMode";
 import { isActiveSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
 type LocalSeedPayload = {
@@ -36,6 +38,7 @@ type LocalOverlayState = {
 };
 
 const seed = seedData as LocalSeedPayload;
+const demoSeed = demoPayload as LocalSeedPayload;
 const STORAGE_VERSION_KEY = "anytrace.local.version";
 const STORAGE_VCS_KEY = "anytrace.local.vcs";
 const STORAGE_TRACKED_PEOPLE_KEY = "anytrace.local.tracked-people";
@@ -50,9 +53,17 @@ let backendSnapshotCache: LocalSeedPayload | null = null;
 let backendSnapshotState: "idle" | "ready" | "unavailable" = "idle";
 let backendSnapshotLastError: string | null = null;
 
+function activeSeed() {
+  return isAnytraceDemoMode() ? demoSeed : seed;
+}
+
 function backendBaseUrl() {
   const value = (import.meta.env.VITE_ANYTRACE_BACKEND_URL as string | undefined)?.trim();
-  return value || "http://127.0.0.1:8766";
+  if (!value) return "http://127.0.0.1:8767";
+  if (value === "http://127.0.0.1:8766" || value === "http://localhost:8766") {
+    return "http://127.0.0.1:8767";
+  }
+  return value;
 }
 
 function canUseStorage() {
@@ -60,20 +71,25 @@ function canUseStorage() {
 }
 
 function ensureInitialized() {
+  if (isAnytraceDemoMode()) {
+    initialized = true;
+    return;
+  }
+
   if (initialized || !canUseStorage()) {
     initialized = true;
     return;
   }
 
   const currentVersion = window.localStorage.getItem(STORAGE_VERSION_KEY);
-  if (currentVersion !== seed.version) {
+  if (currentVersion !== activeSeed().version) {
     window.localStorage.removeItem(STORAGE_VCS_KEY);
     window.localStorage.removeItem(STORAGE_TRACKED_PEOPLE_KEY);
     window.localStorage.removeItem(STORAGE_IDENTITIES_KEY);
     window.localStorage.removeItem(STORAGE_HIDDEN_VCS_KEY);
     window.localStorage.removeItem(STORAGE_HIDDEN_TRACKED_PEOPLE_KEY);
     window.localStorage.removeItem(LEGACY_REMOTE_AUTH_KEY);
-    window.localStorage.setItem(STORAGE_VERSION_KEY, seed.version);
+    window.localStorage.setItem(STORAGE_VERSION_KEY, activeSeed().version);
   }
 
   initialized = true;
@@ -112,6 +128,16 @@ function createId(prefix: string) {
 }
 
 function readOverlayState(): LocalOverlayState {
+  if (isAnytraceDemoMode()) {
+    return {
+      vcs: [],
+      trackedPeople: [],
+      personIdentities: [],
+      hiddenVcIds: [],
+      hiddenTrackedPersonIds: [],
+    };
+  }
+
   return {
     vcs: readStorage(STORAGE_VCS_KEY, [] as VcSource[]),
     trackedPeople: readStorage(STORAGE_TRACKED_PEOPLE_KEY, [] as TrackedPerson[]),
@@ -122,6 +148,8 @@ function readOverlayState(): LocalOverlayState {
 }
 
 function writeOverlayState(state: LocalOverlayState) {
+  if (isAnytraceDemoMode()) return;
+
   writeStorage(STORAGE_VCS_KEY, state.vcs);
   writeStorage(STORAGE_TRACKED_PEOPLE_KEY, state.trackedPeople);
   writeStorage(STORAGE_IDENTITIES_KEY, state.personIdentities);
@@ -130,7 +158,7 @@ function writeOverlayState(state: LocalOverlayState) {
 }
 
 function mergedVcs(state: LocalOverlayState) {
-  return mergedVcsFromBase(state, seed.vcSources);
+  return mergedVcsFromBase(state, activeSeed().vcSources);
 }
 
 function mergedVcsFromBase(state: LocalOverlayState, baseVcs: VcSource[]) {
@@ -141,7 +169,7 @@ function mergedVcsFromBase(state: LocalOverlayState, baseVcs: VcSource[]) {
 }
 
 function mergedTrackedPeople(state: LocalOverlayState) {
-  return mergedTrackedPeopleFromBase(state, seed.trackedPeople);
+  return mergedTrackedPeopleFromBase(state, activeSeed().trackedPeople);
 }
 
 function mergedTrackedPeopleFromBase(state: LocalOverlayState, baseTrackedPeople: TrackedPerson[]) {
@@ -152,7 +180,7 @@ function mergedTrackedPeopleFromBase(state: LocalOverlayState, baseTrackedPeople
 }
 
 function mergedPersonIdentities(state: LocalOverlayState) {
-  return mergedPersonIdentitiesFromBase(state, seed.personIdentities);
+  return mergedPersonIdentitiesFromBase(state, activeSeed().personIdentities);
 }
 
 function mergedPersonIdentitiesFromBase(state: LocalOverlayState, baseIdentities: PersonIdentity[]) {
@@ -173,6 +201,7 @@ export function clearSignalCaches() {
 }
 
 export function shouldRetryBackendSnapshot() {
+  if (isAnytraceDemoMode()) return false;
   return backendSnapshotState !== "ready";
 }
 
@@ -252,7 +281,7 @@ export async function addLocalVc(draft: {
 
 export async function removeLocalVc(vcSourceId: string) {
   const state = readOverlayState();
-  const seedIds = new Set(seed.vcSources.map((vc) => vc.id));
+  const seedIds = new Set(activeSeed().vcSources.map((vc) => vc.id));
 
   if (seedIds.has(vcSourceId)) {
     state.hiddenVcIds = [...new Set([...state.hiddenVcIds, vcSourceId])];
@@ -342,7 +371,7 @@ export async function addLocalTrackedPerson(draft: {
 
 export async function removeLocalTrackedPerson(personId: string) {
   const state = readOverlayState();
-  const seedIds = new Set(seed.trackedPeople.map((person) => person.id));
+  const seedIds = new Set(activeSeed().trackedPeople.map((person) => person.id));
 
   if (seedIds.has(personId)) {
     state.hiddenTrackedPersonIds = [...new Set([...state.hiddenTrackedPersonIds, personId])];
@@ -357,52 +386,53 @@ export async function removeLocalTrackedPerson(personId: string) {
 export async function fetchVcSources() {
   const state = readOverlayState();
   const backend = await fetchBackendSnapshot();
-  return mergedVcsFromBase(state, backend?.vcSources ?? seed.vcSources);
+  return mergedVcsFromBase(state, backend?.vcSources ?? activeSeed().vcSources);
 }
 
 export async function fetchTrackedPeople() {
   const state = readOverlayState();
   const backend = await fetchBackendSnapshot();
-  return mergedTrackedPeopleFromBase(state, backend?.trackedPeople ?? seed.trackedPeople);
+  return mergedTrackedPeopleFromBase(state, backend?.trackedPeople ?? activeSeed().trackedPeople);
 }
 
 export async function fetchPersonIdentities() {
   const state = readOverlayState();
   const backend = await fetchBackendSnapshot();
-  return mergedPersonIdentitiesFromBase(state, backend?.personIdentities ?? seed.personIdentities);
+  return mergedPersonIdentitiesFromBase(state, backend?.personIdentities ?? activeSeed().personIdentities);
 }
 
 export async function fetchActivityEvents() {
   const backend = await fetchBackendSnapshot();
-  return [...(backend?.activityEvents ?? seed.activityEvents)];
+  return [...(backend?.activityEvents ?? activeSeed().activityEvents)];
 }
 
 export async function fetchWeeklyPicks() {
   const backend = await fetchBackendSnapshot();
-  return [...(backend?.weeklyPicks ?? seed.weeklyPicks)];
+  return [...(backend?.weeklyPicks ?? activeSeed().weeklyPicks)];
 }
 
 export async function fetchSeedFollowAlerts() {
   const backend = await fetchBackendSnapshot();
-  return [...(backend?.seedFollowAlerts ?? seed.seedFollowAlerts ?? [])].filter(isActiveSeedFollowAlert);
+  return [...(backend?.seedFollowAlerts ?? activeSeed().seedFollowAlerts ?? [])].filter(isActiveSeedFollowAlert);
 }
 
 export async function fetchAppSettings(): Promise<AnytraceAppSettings> {
   const backend = await fetchBackendSnapshot();
   return {
-    seedFollowAlertThreshold: backend?.appSettings?.seedFollowAlertThreshold ?? seed.appSettings?.seedFollowAlertThreshold ?? 2,
+    seedFollowAlertThreshold: backend?.appSettings?.seedFollowAlertThreshold ?? activeSeed().appSettings?.seedFollowAlertThreshold ?? 3,
+    seedScan: backend?.appSettings?.seedScan ?? activeSeed().appSettings?.seedScan ?? null,
   };
 }
 
 export async function fetchGithubSignalProfiles() {
   const backend = await fetchBackendSnapshot();
-  return [...(backend?.githubSignalProfiles ?? seed.githubSignalProfiles)];
+  return [...(backend?.githubSignalProfiles ?? activeSeed().githubSignalProfiles)];
 }
 
 export async function fetchGraphData(): Promise<GraphData> {
   const state = readOverlayState();
   const backend = await fetchBackendSnapshot();
-  const base = backend ?? seed;
+  const base = backend ?? activeSeed();
   const vcs = mergedVcsFromBase(state, base.vcSources);
   const people = mergedTrackedPeopleFromBase(state, base.trackedPeople);
 
@@ -418,6 +448,11 @@ export async function fetchGraphData(): Promise<GraphData> {
 }
 
 async function fetchBackendSnapshot() {
+  if (isAnytraceDemoMode()) {
+    backendSnapshotState = "ready";
+    return activeSeed();
+  }
+
   if (backendSnapshotCache) {
     backendSnapshotState = "ready";
     return backendSnapshotCache;
@@ -457,7 +492,8 @@ async function fetchBackendSnapshot() {
           graphEdges: payload.graphEdges ?? [],
           graphSource: payload.graphSource ?? ((payload.graphEdges?.length ?? 0) > 0 ? "snapshot" : "empty"),
           appSettings: {
-            seedFollowAlertThreshold: payload.appSettings?.seedFollowAlertThreshold ?? 2,
+            seedFollowAlertThreshold: payload.appSettings?.seedFollowAlertThreshold ?? 3,
+            seedScan: payload.appSettings?.seedScan ?? null,
           },
         };
         backendSnapshotState = "ready";

@@ -63,11 +63,11 @@ export default function SettingsPage() {
               <div>
                 <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                   <BellRing className="h-3.5 w-3.5" />
-                  Alert logic
+                  Signal logic
                 </div>
                 <h3 className="text-base font-medium">Seed-follow threshold</h3>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  Neue Alerts entstehen, sobald eine entdeckte Person von mindestens dieser Anzahl kuratierter Seed-Accounts gefolgt wird. Bestehende Alerts bleiben als Historie erhalten.
+                  Neue Source-Signale entstehen, sobald eine entdeckte Person von mindestens dieser Anzahl kuratierter Seed-Accounts gefolgt wird. Bestehende Signale bleiben als Historie erhalten.
                 </p>
               </div>
 
@@ -130,7 +130,7 @@ export default function SettingsPage() {
 
                 {updateAppSettings.data ? (
                   <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
-                    Threshold gespeichert. {updateAppSettings.data.backfillStats?.alertsCreated ?? 0} zusaetzliche Alerts aus vorhandenen Beobachtungen erzeugt.
+                    Threshold gespeichert. {updateAppSettings.data.backfillStats?.alertsCreated ?? 0} zusaetzliche Source-Signale aus vorhandenen Beobachtungen erzeugt.
                   </div>
                 ) : null}
               </div>
