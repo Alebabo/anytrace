@@ -1,4 +1,4 @@
-import type { SeedFollowAlert, SeedFollowPromotionDraft } from "@/data/anytrace";
+import type { SeedFollowAlert, SeedFollowPromotionDraft } from "@/data/traqr";
 
 const JOURNALIST_ROLE_KEYWORDS = [
   "journalist",

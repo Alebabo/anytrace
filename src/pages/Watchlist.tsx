@@ -1,8 +1,8 @@
 import { ArrowUpRight, Linkedin, Plus, Sparkles, Trash2, Twitter, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ProductGate } from "@/components/anytrace/ProductGate";
-import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
+import { ProductGate } from "@/components/traqr/ProductGate";
+import { EntityAvatar } from "@/components/traqr/EntityAvatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,8 +20,8 @@ import {
   useRemoveVcFromWatchlist,
   useSeedFollowAlerts,
   useWatchlist,
-} from "@/hooks/useAnytrace";
-import type { PersonIdentity, SeedFollowAlert, UserVcWatchlistItem, VcAccountType, VcTier, WatchlistPerson } from "@/data/anytrace";
+} from "@/hooks/useTraqr";
+import type { PersonIdentity, SeedFollowAlert, UserVcWatchlistItem, VcAccountType, VcTier, WatchlistPerson } from "@/data/traqr";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 import { personDisplayLabel } from "@/lib/personLabels";
 import { isVisibleSeedFollowAlert } from "@/lib/seedFollowAlerts";

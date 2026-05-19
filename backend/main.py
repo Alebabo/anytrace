@@ -83,7 +83,7 @@ def run_identity_match():
 def run_triage() -> dict:
     result = TriageEngine.build().run()
     logging.getLogger(__name__).info(
-        "Anytrace.ai triage completed with status=%s qualified=%s",
+        "traqr.ai triage completed with status=%s qualified=%s",
         result.get("status"),
         result.get("qualifiedCount"),
     )
@@ -95,17 +95,31 @@ def run_alerts() -> None:
     logging.getLogger(__name__).info("Alert run sent %s emails", len(sent))
 
 
-def run_pipeline() -> None:
-    run_github()
-    run_twitter()
+def run_pipeline() -> dict:
+    github_summary = run_github()
+    twitter_results = run_twitter()
     run_scores()
-    run_linkedin()
+    linkedin_result = run_linkedin()
     run_news()
+    triage_result = run_triage()
     run_alerts()
+    return {
+        "ok": True,
+        "status": "completed",
+        "github": {
+            "trackedCount": len(github_summary.tracked_results),
+            "viralRepoCount": len(github_summary.viral_results),
+        },
+        "twitter": {
+            "processed": len(twitter_results),
+        },
+        "linkedin": linkedin_result,
+        "triage": triage_result,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Anytrace seed-source signal backend")
+    parser = argparse.ArgumentParser(description="traqr.ai seed-source signal backend")
     parser.add_argument(
         "command",
         choices=[

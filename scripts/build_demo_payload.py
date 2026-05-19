@@ -836,7 +836,7 @@ def build() -> dict:
         "agentLog": [
             {
                 "stage": "snapshot",
-                "message": "Loaded public-safe demo snapshot from local Anytrace data.",
+                "message": "Loaded public-safe demo snapshot from local traqr.ai data.",
                 "timestamp": iso_datetime(0, 9, 0),
             },
             {

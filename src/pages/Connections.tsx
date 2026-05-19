@@ -9,8 +9,8 @@ import {
   Twitter,
   User,
 } from "lucide-react";
-import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
-import { ProductGate } from "@/components/anytrace/ProductGate";
+import { EntityAvatar } from "@/components/traqr/EntityAvatar";
+import { ProductGate } from "@/components/traqr/ProductGate";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAccessState,
@@ -19,8 +19,8 @@ import {
   useGraphData,
   usePersonIdentities,
   useVcSources,
-} from "@/hooks/useAnytrace";
-import type { PersonIdentity, VcSource } from "@/data/anytrace";
+} from "@/hooks/useTraqr";
+import type { PersonIdentity, VcSource } from "@/data/traqr";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 import { isGenericTrackedRole, personDisplayLabel } from "@/lib/personLabels";
 
@@ -440,7 +440,7 @@ export default function ConnectionDetail() {
 
                         <p className="mt-5 max-w-[760px] text-[14px] leading-6 text-[#403f3c] sm:text-[15px] sm:leading-7">
                           {person.summary?.trim() ||
-                            `${person.fullName} is tracked in Anytrace through connected GitHub, X, and LinkedIn signals. This dossier summarizes current repository momentum, network activity, and evidence that makes the profile relevant.`}
+                            `${person.fullName} is tracked in traqr.ai through connected GitHub, X, and LinkedIn signals. This dossier summarizes current repository momentum, network activity, and evidence that makes the profile relevant.`}
                         </p>
                       </div>
                     </div>

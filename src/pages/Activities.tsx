@@ -1,14 +1,14 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Clock, Heart, RotateCcw, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
-import { ProductGate } from "@/components/anytrace/ProductGate";
-import { SeedPromotionDialog } from "@/components/anytrace/SeedPromotionDialog";
+import { ProductGate } from "@/components/traqr/ProductGate";
+import { SeedPromotionDialog } from "@/components/traqr/SeedPromotionDialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAccessState, useAppSettings, useSeedFollowAlerts, useUpdateSeedFollowAlertStatus } from "@/hooks/useAnytrace";
-import type { SeedFollowAlert, SeedFollowerAccount } from "@/data/anytrace";
+import { useAccessState, useAppSettings, useSeedFollowAlerts, useUpdateSeedFollowAlertStatus } from "@/hooks/useTraqr";
+import type { SeedFollowAlert, SeedFollowerAccount } from "@/data/traqr";
 import { isActiveSeedFollowAlert, isArchivedSeedFollowAlert, isLikedSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
 type AlertFilter = "top-picks" | "all" | "today" | "this-week" | "liked" | "seen" | "archived" | "multi-follow" | "threshold-only";

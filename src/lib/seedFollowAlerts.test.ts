@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SeedFollowAlert } from "@/data/anytrace";
+import type { SeedFollowAlert } from "@/data/traqr";
 import {
   buildSeedPromotionDraft,
   isActiveSeedFollowAlert,

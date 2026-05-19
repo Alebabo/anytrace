@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { BellRing, DatabaseZap, Layers3, RefreshCcw, Save, ShieldOff, Trash2 } from "lucide-react";
-import { useAppSettings, useRefreshAnytraceData, useResetActivities, useUpdateAppSettings } from "@/hooks/useAnytrace";
-import { ProductGate } from "@/components/anytrace/ProductGate";
+import { FullPipelinePanel } from "@/components/traqr/FullPipelinePanel";
+import { useAppSettings, useRefreshTraqrData, useResetActivities, useUpdateAppSettings } from "@/hooks/useTraqr";
+import { ProductGate } from "@/components/traqr/ProductGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ export default function SettingsPage() {
   const appSettings = useAppSettings();
   const updateAppSettings = useUpdateAppSettings();
   const resetActivities = useResetActivities();
-  const refreshAnytraceData = useRefreshAnytraceData();
+  const refreshTraqrData = useRefreshTraqrData();
   const [thresholdDraft, setThresholdDraft] = useState(2);
 
   useEffect(() => {
@@ -58,6 +59,8 @@ export default function SettingsPage() {
         </div>
 
         <div className="grid gap-4">
+          <FullPipelinePanel />
+
           <Card className="rounded-[28px] border-border p-6 shadow-none">
             <div className="flex flex-col gap-5">
               <div>
@@ -158,8 +161,8 @@ export default function SettingsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => refreshAnytraceData.mutate()}
-                  disabled={refreshAnytraceData.isPending}
+                  onClick={() => refreshTraqrData.mutate()}
+                  disabled={refreshTraqrData.isPending}
                   className="rounded-full"
                 >
                   <RefreshCcw className="h-4 w-4" />
@@ -178,9 +181,9 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
-              {refreshAnytraceData.isError && (
+              {refreshTraqrData.isError && (
                 <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                  {(refreshAnytraceData.error as Error)?.message || "Die Daten konnten nicht neu geladen werden."}
+                  {(refreshTraqrData.error as Error)?.message || "Die Daten konnten nicht neu geladen werden."}
                 </div>
               )}
 

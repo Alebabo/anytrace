@@ -239,7 +239,7 @@ class TriageEngine:
         provider = "featherless"
         model = self.settings.featherless_triage_model
         agent_log: list[dict[str, Any]] = [
-            self._log("system", f"Starting Anytrace.ai signal triage with {threshold}+ source threshold.", started_at),
+            self._log("system", f"Starting traqr.ai signal triage with {threshold}+ source threshold.", started_at),
         ]
 
         latest_linkedin = self.db.list_latest_linkedin_enrichments_by_person()
@@ -297,7 +297,7 @@ class TriageEngine:
                     if github_signal:
                         agent_log.append(self._log("github", f"Adding GitHub builder evidence for {handle}: {github_signal}."))
             else:
-                agent_log.append(self._log("collector", f"Skipping {handle}: below Anytrace.ai proof-of-signal threshold."))
+                agent_log.append(self._log("collector", f"Skipping {handle}: below traqr.ai proof-of-signal threshold."))
 
         if not target_candidates:
             completed_at = utc_now().isoformat()
@@ -836,7 +836,7 @@ class TriageEngine:
             {
                 "type": "x_follow_cluster",
                 "label": f"{follower_count} curated signal sources follow this profile",
-                "source": "Anytrace.ai signal network",
+                "source": "traqr.ai signal network",
             },
             *[
                 {
@@ -1090,7 +1090,7 @@ class TriageEngine:
                 "Authorization": f"Bearer {self.settings.featherless_api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": self.settings.frontend_base_url,
-                "X-Title": "Anytrace.ai Featherless Triage",
+                "X-Title": "traqr.ai Featherless Triage",
             },
             json={
                 "model": self.settings.featherless_triage_model,
@@ -1100,7 +1100,7 @@ class TriageEngine:
                     {
                         "role": "system",
                         "content": (
-                            "You are the Anytrace.ai VC sourcing triage agent. Classify alert-qualified X profiles for "
+                            "You are the traqr.ai VC sourcing triage agent. Classify alert-qualified X profiles for "
                             "early-stage European VC sourcing. Optimize for potential founders and founders likely to "
                             "raise pre-seed soon. Do not reward famous AI labs, large company accounts, public tech "
                             "figures, investors, or VC partners for obvious network gravity. VC/investor employees must be discard unless "
@@ -1443,7 +1443,7 @@ class TriageEngine:
             fragments.append(f"{source_count} curated signal sources follow this profile.")
 
         if not fragments:
-            return "Anytrace.ai has a follow-cluster signal, but the profile still needs founder and company verification."
+            return "traqr.ai has a follow-cluster signal, but the profile still needs founder and company verification."
         return " ".join(fragments)[:520]
 
     @staticmethod

@@ -1,7 +1,7 @@
 import seedData from "@/data/localSeedData.json";
 import type {
   ActivityEvent,
-  AnytraceAppSettings,
+  TraqrAppSettings,
   GithubSignalProfile,
   GraphData,
   GraphEdge,
@@ -10,9 +10,9 @@ import type {
   TrackedPerson,
   VcSource,
   WeeklyPick,
-} from "@/data/anytrace";
+} from "@/data/traqr";
 import { demoPayload } from "@/lib/demoData";
-import { isAnytraceDemoMode } from "@/lib/demoMode";
+import { isTraqrDemoMode } from "@/lib/demoMode";
 import { isActiveSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
 type LocalSeedPayload = {
@@ -26,7 +26,7 @@ type LocalSeedPayload = {
   githubSignalProfiles: GithubSignalProfile[];
   graphEdges: GraphEdge[];
   graphSource?: GraphData["graphSource"];
-  appSettings?: AnytraceAppSettings;
+  appSettings?: TraqrAppSettings;
 };
 
 type LocalOverlayState = {
@@ -39,13 +39,13 @@ type LocalOverlayState = {
 
 const seed = seedData as LocalSeedPayload;
 const demoSeed = demoPayload as LocalSeedPayload;
-const STORAGE_VERSION_KEY = "anytrace.local.version";
-const STORAGE_VCS_KEY = "anytrace.local.vcs";
-const STORAGE_TRACKED_PEOPLE_KEY = "anytrace.local.tracked-people";
-const STORAGE_IDENTITIES_KEY = "anytrace.local.identities";
-const STORAGE_HIDDEN_VCS_KEY = "anytrace.local.hidden-vcs";
-const STORAGE_HIDDEN_TRACKED_PEOPLE_KEY = "anytrace.local.hidden-tracked-people";
-const LEGACY_REMOTE_AUTH_KEY = ["anytrace", "supa", "base", "session"].join(".");
+const STORAGE_VERSION_KEY = "traqr.local.version";
+const STORAGE_VCS_KEY = "traqr.local.vcs";
+const STORAGE_TRACKED_PEOPLE_KEY = "traqr.local.tracked-people";
+const STORAGE_IDENTITIES_KEY = "traqr.local.identities";
+const STORAGE_HIDDEN_VCS_KEY = "traqr.local.hidden-vcs";
+const STORAGE_HIDDEN_TRACKED_PEOPLE_KEY = "traqr.local.hidden-tracked-people";
+const LEGACY_REMOTE_AUTH_KEY = ["traqr", "supa", "base", "session"].join(".");
 
 let initialized = false;
 let backendSnapshotPromise: Promise<LocalSeedPayload | null> | null = null;
@@ -54,11 +54,11 @@ let backendSnapshotState: "idle" | "ready" | "unavailable" = "idle";
 let backendSnapshotLastError: string | null = null;
 
 function activeSeed() {
-  return isAnytraceDemoMode() ? demoSeed : seed;
+  return isTraqrDemoMode() ? demoSeed : seed;
 }
 
 function backendBaseUrl() {
-  const value = (import.meta.env.VITE_ANYTRACE_BACKEND_URL as string | undefined)?.trim();
+  const value = (import.meta.env.VITE_TRAQR_BACKEND_URL as string | undefined)?.trim();
   if (!value) return "http://127.0.0.1:8767";
   if (value === "http://127.0.0.1:8766" || value === "http://localhost:8766") {
     return "http://127.0.0.1:8767";
@@ -71,7 +71,7 @@ function canUseStorage() {
 }
 
 function ensureInitialized() {
-  if (isAnytraceDemoMode()) {
+  if (isTraqrDemoMode()) {
     initialized = true;
     return;
   }
@@ -128,7 +128,7 @@ function createId(prefix: string) {
 }
 
 function readOverlayState(): LocalOverlayState {
-  if (isAnytraceDemoMode()) {
+  if (isTraqrDemoMode()) {
     return {
       vcs: [],
       trackedPeople: [],
@@ -148,7 +148,7 @@ function readOverlayState(): LocalOverlayState {
 }
 
 function writeOverlayState(state: LocalOverlayState) {
-  if (isAnytraceDemoMode()) return;
+  if (isTraqrDemoMode()) return;
 
   writeStorage(STORAGE_VCS_KEY, state.vcs);
   writeStorage(STORAGE_TRACKED_PEOPLE_KEY, state.trackedPeople);
@@ -201,7 +201,7 @@ export function clearSignalCaches() {
 }
 
 export function shouldRetryBackendSnapshot() {
-  if (isAnytraceDemoMode()) return false;
+  if (isTraqrDemoMode()) return false;
   return backendSnapshotState !== "ready";
 }
 
@@ -267,7 +267,7 @@ export async function addLocalVc(draft: {
     isPrimaryClusterAccount: true,
     notes: "",
     isSeeded: false,
-    createdByUserId: "local-anytrace-user",
+    createdByUserId: "local-traqr-user",
     syncStatus: "idle",
     lastXSyncAt: null,
     lastGithubSyncAt: null,
@@ -416,7 +416,7 @@ export async function fetchSeedFollowAlerts() {
   return [...(backend?.seedFollowAlerts ?? activeSeed().seedFollowAlerts ?? [])].filter(isActiveSeedFollowAlert);
 }
 
-export async function fetchAppSettings(): Promise<AnytraceAppSettings> {
+export async function fetchAppSettings(): Promise<TraqrAppSettings> {
   const backend = await fetchBackendSnapshot();
   return {
     seedFollowAlertThreshold: backend?.appSettings?.seedFollowAlertThreshold ?? activeSeed().appSettings?.seedFollowAlertThreshold ?? 3,
@@ -448,7 +448,7 @@ export async function fetchGraphData(): Promise<GraphData> {
 }
 
 async function fetchBackendSnapshot() {
-  if (isAnytraceDemoMode()) {
+  if (isTraqrDemoMode()) {
     backendSnapshotState = "ready";
     return activeSeed();
   }
@@ -465,7 +465,7 @@ async function fetchBackendSnapshot() {
         if (!response.ok) {
           backendSnapshotState = "unavailable";
           backendSnapshotLastError = `Backend responded with ${response.status}.`;
-          console.warn("[anytrace] frontend-data request failed", {
+          console.warn("[traqr] frontend-data request failed", {
             status: response.status,
             statusText: response.statusText,
           });
@@ -476,7 +476,7 @@ async function fetchBackendSnapshot() {
         if (payload.ok === false) {
           backendSnapshotState = "unavailable";
           backendSnapshotLastError = "Backend returned ok=false.";
-          console.warn("[anytrace] frontend-data payload returned ok=false");
+          console.warn("[traqr] frontend-data payload returned ok=false");
           return null;
         }
 
@@ -502,7 +502,7 @@ async function fetchBackendSnapshot() {
       } catch (error) {
         backendSnapshotState = "unavailable";
         backendSnapshotLastError = error instanceof Error ? error.message : "Unknown backend fetch error.";
-        console.warn("[anytrace] frontend-data request threw", error);
+        console.warn("[traqr] frontend-data request threw", error);
         return null;
       } finally {
         backendSnapshotPromise = null;

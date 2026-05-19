@@ -57,5 +57,5 @@ def build_scheduler() -> BlockingScheduler:
 
 def start_scheduler() -> None:
     scheduler = build_scheduler()
-    logger.info("Starting Anytrace backend scheduler.")
+    logger.info("Starting traqr.ai backend scheduler.")
     scheduler.start()

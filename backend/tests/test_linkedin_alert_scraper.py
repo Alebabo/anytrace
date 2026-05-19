@@ -34,7 +34,7 @@ class FakeResponse:
 class LinkedInAlertScraperTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.db_path = Path(self.temp_dir.name) / "anytrace-test.db"
+        self.db_path = Path(self.temp_dir.name) / "traqr-test.db"
         self.db = SupabaseDB(self.db_path)
         self.db.set_seed_follow_alert_threshold(3)
         self.settings = replace(
@@ -202,7 +202,7 @@ class LinkedInAlertScraperTest(unittest.TestCase):
         self.assertEqual(fields["location"], "Berlin, Germany")
 
     def test_api_payload_calls_native_scraper(self) -> None:
-        with patch.dict(os.environ, {"ANYTRACE_LOCAL_DB_PATH": str(self.db_path)}):
+        with patch.dict(os.environ, {"TRAQR_LOCAL_DB_PATH": str(self.db_path)}):
             with patch("backend.scrapers.linkedin_alert_scraper.run_linkedin_alert_enrichment") as runner:
                 runner.return_value = {
                     "ok": True,

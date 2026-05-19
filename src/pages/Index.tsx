@@ -1,21 +1,21 @@
 import { useEffect, useRef } from "react";
 import { ArrowUpRight, Bell, Clock, Eye, Linkedin, RefreshCw, Trash2, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ProductGate } from "@/components/anytrace/ProductGate";
+import { ProductGate } from "@/components/traqr/ProductGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAccessState,
   useAppSettings,
-  useRefreshAnytraceData,
+  useRefreshTraqrData,
   useRunLinkedInEnrichment,
   useSeedScanStatus,
   useRunTwitterScrape,
   useSeedFollowAlerts,
   useUpdateSeedFollowAlertStatus,
-} from "@/hooks/useAnytrace";
-import type { SeedFollowAlert, SeedFollowerAccount } from "@/data/anytrace";
+} from "@/hooks/useTraqr";
+import type { SeedFollowAlert, SeedFollowerAccount } from "@/data/traqr";
 import { isVisibleSeedFollowAlert } from "@/lib/seedFollowAlerts";
 
 function formatTime(value?: string | null) {
@@ -131,7 +131,7 @@ export default function MainDashboard() {
   const { access } = useAccessState();
   const appSettings = useAppSettings(access.isAuthenticated);
   const alertsQuery = useSeedFollowAlerts(access.isAuthenticated);
-  const refreshData = useRefreshAnytraceData();
+  const refreshData = useRefreshTraqrData();
   const runSeedScan = useRunTwitterScrape();
   const seedScanStatusQuery = useSeedScanStatus(access.isAuthenticated);
   const runLinkedInEnrichment = useRunLinkedInEnrichment();

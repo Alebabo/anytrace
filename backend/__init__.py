@@ -1,1 +1,1 @@
-"""Anytrace backend package."""
+"""traqr.ai backend package."""

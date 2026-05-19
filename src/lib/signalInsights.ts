@@ -6,7 +6,7 @@ import type {
   TrackedPerson,
   WeeklyPick,
   WeeklyPickReason,
-} from "@/data/anytrace";
+} from "@/data/traqr";
 
 export type SignalFilterMode = "all" | "multi_follow" | "new" | "cross_verified" | "strong";
 

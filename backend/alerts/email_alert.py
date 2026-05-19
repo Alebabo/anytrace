@@ -27,7 +27,7 @@ class EmailAlertService:
     def _compose_email(self, candidate: dict, score: dict) -> EmailMessage:
         breakdown = score.get("breakdown") or {}
         msg = EmailMessage()
-        msg["Subject"] = f"Anytrace Alert: {candidate['name']} reached score {score['score_total']}"
+        msg["Subject"] = f"traqr.ai Alert: {candidate['name']} reached score {score['score_total']}"
         msg["From"] = self.settings.smtp_user
         msg["To"] = self.settings.alert_email
 

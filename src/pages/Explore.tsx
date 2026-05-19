@@ -15,9 +15,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Flame, Info, RefreshCw, RotateCcw, Search, SlidersHorizontal, Users2, X } from "lucide-react";
-import { ProductGate } from "@/components/anytrace/ProductGate";
-import { ActivityLine } from "@/components/anytrace/ActivityLine";
-import { EntityAvatar } from "@/components/anytrace/EntityAvatar";
+import { ProductGate } from "@/components/traqr/ProductGate";
+import { ActivityLine } from "@/components/traqr/ActivityLine";
+import { EntityAvatar } from "@/components/traqr/EntityAvatar";
 import {
   Dialog,
   DialogContent,
@@ -30,8 +30,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useAccessState, useGraphData, usePersonIdentities, useRefreshAnytraceData } from "@/hooks/useAnytrace";
-import type { ActivityPlatform, GraphEdge, PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
+import { useAccessState, useGraphData, usePersonIdentities, useRefreshTraqrData } from "@/hooks/useTraqr";
+import type { ActivityPlatform, GraphEdge, PersonIdentity, TrackedPerson, VcSource } from "@/data/traqr";
 import { avatarSourcesForPerson, avatarSourcesForVc } from "@/lib/avatarSources";
 import { personDisplayLabel } from "@/lib/personLabels";
 
@@ -141,7 +141,7 @@ const nodeTypes = {
   person: PersonNode,
 };
 
-const GRAPH_FILTER_PREFS_KEY = "anytrace-graph-filter-prefs";
+const GRAPH_FILTER_PREFS_KEY = "traqr-graph-filter-prefs";
 const DEFAULT_GRAPH_PERSON_LIMIT = 40;
 const DEFAULT_EDGES_PER_PERSON = 2;
 
@@ -369,7 +369,7 @@ function GraphInner() {
   const { access } = useAccessState();
   const graphQuery = useGraphData(access.isAuthenticated);
   const identitiesQuery = usePersonIdentities(access.isAuthenticated);
-  const refreshData = useRefreshAnytraceData();
+  const refreshData = useRefreshTraqrData();
   const [query, setQuery] = useState("");
   const [overviewQuery, setOverviewQuery] = useState("");
   const [showOnlyTop, setShowOnlyTop] = useState(false);
@@ -1115,7 +1115,7 @@ function GraphInner() {
           />
         ) : (
           <ReactFlow
-            className="anytrace-graph-flow"
+            className="traqr-graph-flow"
             nodes={built.nodes}
             edges={built.edges}
             nodeTypes={nodeTypes}

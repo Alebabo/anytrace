@@ -1,4 +1,4 @@
-import type { TrackedPerson } from "@/data/anytrace";
+import type { TrackedPerson } from "@/data/traqr";
 
 export function isGenericTrackedRole(roleTitle?: string | null) {
   const normalized = roleTitle?.trim().toLowerCase() || "";

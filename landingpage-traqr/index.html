@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>traqr.ai | Signal Intelligence for Venture Teams</title>
+    <meta
+      name="description"
+      content="traqr.ai makes momentum across X, GitHub, LinkedIn, and VC networks visible. Track signals, understand connections, and prioritize the right people earlier."
+    />
+    <meta
+      name="keywords"
+      content="traqr.ai, venture intelligence, dealflow, VC signals, founder discovery, GitHub signals, LinkedIn signals, startup sourcing"
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#faf9f6" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="traqr.ai | Signal Intelligence for Venture Teams" />
+    <meta
+      property="og:description"
+      content="See who is building momentum and why. traqr.ai turns network, GitHub, and social signals into a clear sourcing interface."
+    />
+    <meta property="og:image" content="./assets/og-preview.svg" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="traqr.ai | Signal Intelligence for Venture Teams" />
+    <meta
+      name="twitter:description"
+      content="The interface for VC signals, connection graphs, evidence timelines, and watchlists."
+    />
+    <meta name="twitter:image" content="./assets/og-preview.svg" />
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js" defer></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "traqr.ai",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "traqr.ai helps venture teams see early momentum across X, GitHub, LinkedIn, and curated VC networks.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+        "featureList": ["Connection Graph", "Evidence Timelines", "Weekly Ranking", "Watchlists for venture teams"]
+      }
+    </script>
+  </head>
+  <body>
+    <div class="canvas">
+      <header class="site-header">
+        <a class="brandmark" href="#top" aria-label="traqr.ai home">
+          <img src="./assets/logo.svg" alt="traqr.ai" />
+        </a>
+        <nav class="site-nav" aria-label="Main navigation">
+          <a href="#product">Product</a>
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#screens">Screens</a>
+        </nav>
+        <a class="header-cta" href="#cta">Early Access</a>
+      </header>
+      <a
+        class="demo-corner-link"
+        href="https://traqr-ai.vercel.app"
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Open traqr.ai demo in a new window"
+        title="Open demo"
+      >
+        &#8599;
+      </a>
+
+      <main id="top">
+        <section class="hero" id="product">
+          <div class="hero-copy">
+            <h1>traqr.ai shows who is gaining real attention right now.</h1>
+            <p class="hero-text">
+              No generic feeds, no disconnected screenshots, no signal noise. traqr.ai connects X, GitHub, LinkedIn,
+              and curated VC profiles into one readable interface for sourcing, ranking, and conviction.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#cta">Request a demo</a>
+              <a class="button button-secondary" href="#screens">See the product</a>
+            </div>
+            <ul class="hero-points" aria-label="Key benefits">
+              <li>Live X graph across 30+ curated VC accounts</li>
+              <li>Evidence instead of black-box scoring</li>
+              <li>Shared watchlists for your whole team</li>
+            </ul>
+          </div>
+
+          <figure class="hero-screenshot">
+            <img
+              src="./assets/full-overview.png"
+              alt="traqr.ai connection graph — live view with people overview sidebar"
+            />
+          </figure>
+        </section>
+
+        <section class="signal-strip" aria-label="Signal sources">
+          <span>Curated VC network</span>
+          <span>X graph</span>
+          <span>GitHub momentum</span>
+          <span>LinkedIn activity</span>
+          <span>Evidence timelines</span>
+        </section>
+
+        <section class="product-preview">
+          <div class="preview-pair">
+            <figure class="preview-wrap">
+              <img
+                src="./assets/large-graph.png"
+                alt="traqr.ai — live X connection graph showing hundreds of founders and VC accounts"
+                loading="lazy"
+              />
+              <figcaption>The live connection graph — 200+ profiles across 30+ curated VC accounts.</figcaption>
+            </figure>
+            <figure class="preview-wrap">
+              <img
+                src="./assets/Screenshot_swampCommerce.png"
+                alt="traqr.ai connection map — swapcommerce between Cherry Ventures and Filip Dames"
+                loading="lazy"
+              />
+              <figcaption>First-degree connection map — who is watching the same account and why.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="graph-demo-section">
+          <div class="section-heading">
+            <h2>The live connection graph.</h2>
+            <p>Connections between VCs, founders, and repositories — visible, filterable, and traceable in real time.</p>
+          </div>
+          <div class="graph-demo-card">
+            <div class="graph-demo-header">
+              <span class="graph-live-pill">● Live</span>
+              <span class="graph-demo-meta">9 profiles · 10 connections · X follows</span>
+            </div>
+            <div class="graph-svg-wrap">
+              <svg id="graph-svg" aria-label="traqr.ai connection graph demo — hover a node to see its connections"></svg>
+              <div class="graph-tooltip" id="graph-tooltip" aria-live="polite"></div>
+            </div>
+            <div class="graph-demo-hint">Hover or drag a node to explore connections</div>
+          </div>
+        </section>
+
+        <section class="feature-section" id="features">
+          <div class="section-heading">
+            <h2>Built for readability, not dashboard noise.</h2>
+            <p>
+              traqr.ai condenses relevant signals into a few clear surfaces. Each one helps teams prioritize,
+              understand, and discuss what matters.
+            </p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>Weekly Ranking</h3>
+              <p>See who is moving up this week with score, context, and a clear explanation behind every change.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Connection Graph</h3>
+              <p>Connections between VCs, founders, and projects become readable instead of implicit — and filterable.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Evidence Timeline</h3>
+              <p>Every score jump can be traced back to a specific event. That creates trust in both signal and weight.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Shared Watchlists</h3>
+              <p>Teams stay aligned on the right people, repos, and funds without losing context across tools.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="spotlight-section">
+          <div class="spotlight">
+            <div class="spotlight-copy">
+              <h3>See which VCs are already watching the same founder.</h3>
+              <p>
+                Multi-follow patterns make conviction visible before anyone reaches out. When multiple tracked VCs
+                follow the same account, traqr.ai surfaces it immediately — not buried in a list.
+              </p>
+              <a class="button button-secondary spotlight-link" href="#cta">Request access</a>
+            </div>
+            <figure class="spotlight-visual">
+              <img
+                src="./assets/multi-follows.png"
+                alt="traqr.ai graph with Earlybird VC selected — 100 connected people shown"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+
+          <div class="spotlight spotlight-reverse">
+            <figure class="spotlight-visual">
+              <picture>
+                <source media="(max-width: 760px)" srcset="./assets/watchlist mobile.png" />
+                <img
+                  src="./assets/watchlist.png"
+                  alt="traqr.ai Watchlist — Who To Follow recommendations and tracked VC list"
+                  loading="lazy"
+                />
+              </picture>
+            </figure>
+            <div class="spotlight-copy">
+              <h3>Your shortlist, kept current automatically.</h3>
+              <p>
+                Pin any VC, founder, or fund. traqr.ai keeps tracking them in the background and surfaces new follow
+                signals, score changes, and connection shifts — so your team always works from the same picture.
+              </p>
+              <a class="button button-secondary spotlight-link" href="#cta">Request access</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="activity-section">
+          <div class="activity-copy">
+            <h3>Every follow, timestamped and traceable.</h3>
+            <p>
+              The activity feed shows exactly which VC followed whom and when — filtered by X, GitHub, or LinkedIn.
+              No aggregation, no black box. Just the raw signal with a direct link to the source.
+            </p>
+          </div>
+          <figure class="activity-visual">
+            <img
+              src="./assets/Screenshot_follow notification mobile.png"
+              alt="traqr.ai activity feed — Speedinvest followed redpoint and ttunguz on X"
+              loading="lazy"
+            />
+            <figcaption>Activity feed — X follows filtered, with source links and timestamps.</figcaption>
+          </figure>
+        </section>
+
+        <section class="process-section" id="how-it-works">
+          <div class="section-heading">
+            <h2>From scattered signals to a clear sourcing picture.</h2>
+          </div>
+          <div class="process-grid">
+            <article class="process-card">
+              <h3>Collect</h3>
+              <p>traqr.ai ingests signals from X, GitHub, LinkedIn, and curated VC sources continuously.</p>
+            </article>
+            <article class="process-card">
+              <h3>Connect</h3>
+              <p>Profiles, repositories, and funds are connected through visible edges and timestamped events.</p>
+            </article>
+            <article class="process-card">
+              <h3>Explain</h3>
+              <p>Evidence, score, and timeline make it clear why momentum is forming — no black boxes.</p>
+            </article>
+            <article class="process-card">
+              <h3>Prioritize</h3>
+              <p>Your team decides faster which people and projects matter next, with shared context.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="screens-section" id="screens">
+          <div class="section-heading">
+            <h2>Real screens. No mockups.</h2>
+            <p>
+              Every view is built for readability. This is what traqr.ai actually looks like in production.
+            </p>
+          </div>
+          <div class="screens-grid screens-single">
+            <figure class="screen-card">
+              <img
+                src="./assets/full-overview.png"
+                alt="traqr.ai full connection graph with people overview sidebar and live filters"
+                loading="lazy"
+              />
+              <figcaption>Full connection graph — sidebar, live data badge, and multi-follow filter active.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+
+        <section class="cta-section" id="cta">
+          <div class="cta-card">
+            <div>
+              <h2>traqr.ai is invite-only right now.</h2>
+              <p>
+                We are onboarding a small number of venture teams. If sourcing is a priority for you,
+                reach out and we will set up a demo.
+              </p>
+            </div>
+            <div class="cta-actions">
+              <a class="button button-primary" href="mailto:tma.it.support@gmail.com">tma.it.support@gmail.com</a>
+              <a class="button button-secondary" href="#top">Back to top</a>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-inner">
+          <img class="footer-logo" src="./assets/logo.svg" alt="traqr.ai" />
+          <p class="footer-origin">
+            Born at a TUM.ai &times; yellow VC &times; Project A Hackathon
+          </p>
+          <div class="footer-combined" aria-label="traqr.ai, yellow VC, and Project A">
+            <span>traqr.ai</span>
+            <span>yellow VC</span>
+            <span>Project A</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

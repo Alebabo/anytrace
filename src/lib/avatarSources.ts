@@ -1,4 +1,4 @@
-import type { PersonIdentity, TrackedPerson, VcSource } from "@/data/anytrace";
+import type { PersonIdentity, TrackedPerson, VcSource } from "@/data/traqr";
 
 function normalizeHandle(handle?: string | null) {
   return handle?.replace(/^@/, "").trim() || null;

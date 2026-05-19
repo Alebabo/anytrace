@@ -13,15 +13,15 @@ type AuthState = {
   loading: boolean;
 };
 
-const LEGACY_REMOTE_AUTH_KEY = ["anytrace", "supa", "base", "session"].join(".");
+const LEGACY_REMOTE_AUTH_KEY = ["traqr", "supa", "base", "session"].join(".");
 const listeners = new Set<() => void>();
 const defaultSession: AuthSession = {
-  accessToken: "local-anytrace-session",
+  accessToken: "local-traqr-session",
   refreshToken: null,
   expiresAt: null,
   user: {
-    id: "local-anytrace-user",
-    email: "local@anytrace.app",
+    id: "local-traqr-user",
+    email: "local@traqr.ai",
   },
 };
 
@@ -76,9 +76,9 @@ export async function sendMagicLink(_email: string) {
 export function signInAsLocalTestUser(email: string) {
   const session: AuthSession = {
     ...defaultSession,
-    accessToken: `local-anytrace-session:${email}`,
+    accessToken: `local-traqr-session:${email}`,
     user: {
-      id: "local-anytrace-user",
+      id: "local-traqr-user",
       email,
     },
   };

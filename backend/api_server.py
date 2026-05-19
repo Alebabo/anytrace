@@ -6,7 +6,7 @@ import os
 import re
 import hmac
 import threading
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.parse import parse_qs, quote, urlsplit
@@ -104,7 +104,7 @@ def _health_payload() -> dict[str, Any]:
     latest_triage = db.get_latest_triage_run()
     return {
         "ok": True,
-        "service": "anytrace-ai-api",
+        "service": "traqr-ai-api",
         "storage": {
             "backend": "sqlite",
             "path": settings.local_db_path,
@@ -1287,7 +1287,7 @@ def _start_twitter_payload(body: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    thread = threading.Thread(target=_run_twitter_worker, args=(limit,), name="anytrace-seed-scan", daemon=True)
+    thread = threading.Thread(target=_run_twitter_worker, args=(limit,), name="traqr-seed-scan", daemon=True)
     thread.start()
     return {
         "ok": True,
@@ -1347,11 +1347,7 @@ def _identity_payload() -> dict[str, Any]:
 def _pipeline_payload() -> dict[str, Any]:
     from backend.main import run_pipeline
 
-    run_pipeline()
-    return {
-        "ok": True,
-        "status": "completed",
-    }
+    return run_pipeline()
 
 
 def _triage_latest_payload() -> dict[str, Any]:
@@ -1398,6 +1394,202 @@ def _run_linkedin_enrichment_payload(body: dict[str, Any]) -> dict[str, Any]:
         limit=limit,
         missing_only=_body_bool(body, "missingOnly", True),
     )
+
+
+def _positive_int_from_body(body: dict[str, Any], key: str, default: int) -> int:
+    raw = body.get(key)
+    if raw is None or str(raw).strip() == "":
+        return default
+    try:
+        return max(1, int(float(str(raw))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _agent_swarm_run_x_payload(body: dict[str, Any]) -> dict[str, Any]:
+    from backend.config import get_settings
+    from backend.db import SupabaseDB
+    from backend.scrapers.twitter_scraper import TwitterFollowingScraper
+
+    base_settings = get_settings()
+    seed_limit = _positive_int_from_body(body, "seedLimit", base_settings.agent_swarm_seed_limit)
+    page_size = _positive_int_from_body(body, "tweetApiPageSize", base_settings.agent_swarm_tweetapi_page_size)
+    max_pages = _positive_int_from_body(body, "tweetApiMaxPages", base_settings.agent_swarm_tweetapi_max_pages)
+    settings = replace(
+        base_settings,
+        tweetapi_page_size=page_size,
+        tweetapi_max_pages=max_pages,
+        tweetapi_incremental_min_pages=1,
+    )
+    db = SupabaseDB.from_settings(settings)
+    results = TwitterFollowingScraper(db=db, settings=settings).run_all(
+        limit=seed_limit,
+        include_tracked_people=False,
+    )
+    return {
+        "ok": True,
+        "status": "completed",
+        "provider": "tweetapi" if settings.tweetapi_key else "scraper",
+        "limits": {
+            "seedLimit": seed_limit,
+            "tweetApiPageSize": page_size,
+            "tweetApiMaxPages": max_pages,
+        },
+        "processed": len(results),
+        "matchedCandidateCount": sum(int(item.matched_candidate_count) for item in results),
+        "newSnapshotCount": sum(int(item.new_snapshot_count) for item in results),
+        "stoppedEarlyCount": sum(1 for item in results if item.stopped_early),
+        "runs": [_to_jsonable(item) for item in results],
+        "scanSummary": _seed_scan_summary(settings, db),
+    }
+
+
+def _agent_swarm_run_linkedin_payload(body: dict[str, Any]) -> dict[str, Any]:
+    payload = _run_linkedin_enrichment_payload(
+        {
+            "limit": _positive_int_from_body(body, "limit", 3),
+            "missingOnly": body.get("missingOnly", False),
+        }
+    )
+    payload["provider"] = "linkedin"
+    return payload
+
+
+def _agent_swarm_run_github_payload(body: dict[str, Any]) -> dict[str, Any]:
+    from backend.config import get_settings
+    from backend.db import SupabaseDB
+    from backend.scrapers.github_scraper import GithubScraper
+
+    base_settings = get_settings()
+    settings = replace(
+        base_settings,
+        github_viral_repo_limit=_positive_int_from_body(body, "viralRepoLimit", 3),
+        github_network_max_pages=_positive_int_from_body(body, "networkMaxPages", 1),
+    )
+    db = SupabaseDB.from_settings(settings)
+    summary = GithubScraper(db=db, settings=settings).run_all()
+    return {
+        "ok": True,
+        "status": "completed",
+        "provider": "github",
+        "trackedCount": len(summary.tracked_results),
+        "viralRepoCount": len(summary.viral_results),
+        "trackedResults": [_to_jsonable(item) for item in summary.tracked_results],
+        "viralResults": [_to_jsonable(item) for item in summary.viral_results],
+    }
+
+
+def _agent_swarm_run_crunchbase_payload(body: dict[str, Any]) -> dict[str, Any]:
+    from backend.config import get_settings
+    from backend.db import SupabaseDB
+
+    settings = get_settings()
+    if not settings.crunchbase_api_key:
+        return {
+            "ok": False,
+            "status": "configuration_error",
+            "provider": "crunchbase",
+            "error": "CRUNCHBASE_API_KEY is not configured; live Crunchbase enrichment was skipped.",
+            "enriched": 0,
+        }
+
+    db = SupabaseDB.from_settings(settings)
+    candidate_limit = _positive_int_from_body(body, "candidateLimit", 10)
+    linkedin_by_person = db.list_latest_linkedin_enrichments_by_person()
+    alerts = db.list_seed_follow_alerts()[:candidate_limit]
+    companies: list[str] = []
+    seen: set[str] = set()
+    for alert in alerts:
+        enrichment = linkedin_by_person.get(alert.get("discovered_person_id")) or {}
+        company = str(enrichment.get("company") or "").strip()
+        if not company or company.lower() in seen:
+            continue
+        seen.add(company.lower())
+        companies.append(company)
+
+    results: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    for company in companies[:candidate_limit]:
+        try:
+            results.append(_crunchbase_search_organization(settings.crunchbase_api_key, company))
+        except Exception as exc:
+            logger.warning("Crunchbase lookup failed for %s: %s", company, exc)
+            errors.append({"company": company, "error": str(exc)})
+
+    return {
+        "ok": len(errors) == 0,
+        "status": "completed" if len(errors) == 0 else "partial_error",
+        "provider": "crunchbase",
+        "message": "Crunchbase Organization Search completed with live API data only.",
+        "candidateCount": len(alerts),
+        "queriedCompanyCount": len(companies),
+        "enriched": len([row for row in results if row.get("match")]),
+        "results": results,
+        "errors": errors,
+    }
+
+
+def _crunchbase_search_organization(api_key: str, company: str) -> dict[str, Any]:
+    response = requests.post(
+        "https://api.crunchbase.com/api/v4/searches/organizations",
+        params={"user_key": api_key},
+        json={
+            "field_ids": [
+                "identifier",
+                "name",
+                "short_description",
+                "rank_org_company",
+                "website",
+                "founded_on",
+                "num_funding_rounds",
+                "last_funding_type",
+            ],
+            "query": [
+                {
+                    "type": "predicate",
+                    "field_id": "name",
+                    "operator_id": "contains",
+                    "values": [company],
+                }
+            ],
+            "limit": 1,
+        },
+        timeout=20,
+    )
+    if response.status_code == 401:
+        raise RuntimeError("Crunchbase rejected CRUNCHBASE_API_KEY.")
+    if not response.ok:
+        raise RuntimeError(f"Crunchbase returned HTTP {response.status_code}: {response.text[:240]}")
+
+    payload = response.json()
+    entities = payload.get("entities") if isinstance(payload, dict) else None
+    entity = entities[0] if isinstance(entities, list) and entities else None
+    properties = entity.get("properties") if isinstance(entity, dict) else None
+    return {
+        "company": company,
+        "match": properties or None,
+    }
+
+
+def _agent_swarm_top_picks(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    picks: list[dict[str, Any]] = []
+    for result in payload.get("results") or []:
+        if not isinstance(result, dict):
+            continue
+        if result.get("decision") not in {"reach_out_now", "research_more"}:
+            continue
+        if result.get("category") not in {"potential_founder", "active_founder", "company_no_raise_yet"}:
+            continue
+        picks.append(result)
+    return picks
+
+
+def _agent_swarm_run_featherless_payload() -> dict[str, Any]:
+    payload = _triage_run_payload()
+    payload["provider"] = "featherless"
+    payload["topPicks"] = _agent_swarm_top_picks(payload)
+    payload["hiddenCount"] = max(0, len(payload.get("results") or []) - len(payload["topPicks"]))
+    return payload
 
 
 def _ingest_linkedin_make_payload(body: Any, provided_secret: str | None) -> dict[str, Any]:
@@ -1677,7 +1869,7 @@ def _add_tracked_person_payload(body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class AnytraceApiHandler(BaseHTTPRequestHandler):
+class TraqrApiHandler(BaseHTTPRequestHandler):
     routes: dict[str, Callable[[], dict[str, Any]]] = {
         "/health": _health_payload,
         "/frontend-data": _frontend_data_payload,
@@ -1698,7 +1890,7 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Anytrace-Secret, X-Make-Secret")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Traqr-Secret, X-Make-Secret")
         self.end_headers()
 
     def _write_json(self, payload: dict[str, Any], status_code: int = 200) -> None:
@@ -1796,9 +1988,59 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
             self._write_json(payload, 200 if payload.get("ok", True) else 502)
             return
 
+        if path == "/agent-swarm/run-x":
+            try:
+                payload = _agent_swarm_run_x_payload(body_dict)
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200 if payload.get("ok", True) else 500)
+            return
+
+        if path == "/agent-swarm/run-linkedin":
+            try:
+                payload = _agent_swarm_run_linkedin_payload(body_dict)
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200 if payload.get("ok", True) else 500)
+            return
+
+        if path == "/agent-swarm/run-github":
+            try:
+                payload = _agent_swarm_run_github_payload(body_dict)
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200 if payload.get("ok", True) else 500)
+            return
+
+        if path == "/agent-swarm/run-crunchbase":
+            try:
+                payload = _agent_swarm_run_crunchbase_payload(body_dict)
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200)
+            return
+
+        if path == "/agent-swarm/run-featherless-triage":
+            try:
+                payload = _agent_swarm_run_featherless_payload()
+            except Exception as exc:  # pragma: no cover - defensive for local ops
+                logger.exception("API route failed for %s", path)
+                self._write_json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._write_json(payload, 200 if payload.get("ok", True) else 502)
+            return
+
         if path in {"/linkedin-make/ingest", "/ingest-linkedin-make"}:
             provided_secret = (
-                self.headers.get("X-Anytrace-Secret")
+                self.headers.get("X-Traqr-Secret")
                 or self.headers.get("X-Make-Secret")
                 or str(body_dict.get("secret") or "").strip()
                 or None
@@ -1893,8 +2135,8 @@ class AnytraceApiHandler(BaseHTTPRequestHandler):
 
 
 def serve_api() -> None:
-    host = os.getenv("ANYTRACE_API_HOST", "127.0.0.1")
-    port = int(os.getenv("ANYTRACE_API_PORT", "8766"))
-    server = ThreadingHTTPServer((host, port), AnytraceApiHandler)
-    logger.info("Anytrace API listening on http://%s:%s", host, port)
+    host = os.getenv("TRAQR_API_HOST", "127.0.0.1")
+    port = int(os.getenv("TRAQR_API_PORT", "8767"))
+    server = ThreadingHTTPServer((host, port), TraqrApiHandler)
+    logger.info("traqr.ai API listening on http://%s:%s", host, port)
     server.serve_forever()

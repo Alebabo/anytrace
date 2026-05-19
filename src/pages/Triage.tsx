@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -6,10 +6,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Github,
-  Sparkles,
-  Terminal,
 } from "lucide-react";
-import { ProductGate } from "@/components/anytrace/ProductGate";
+import { ProductGate } from "@/components/traqr/ProductGate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -17,13 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAccessState,
   useLatestTriageRun,
-  useRunLinkedInEnrichment,
-  useRunTriage,
-  useRunTwitterScrape,
-  useSeedScanStatus,
-} from "@/hooks/useAnytrace";
-import type { SeedScanStatus, TriageAgentLogEntry, TriageCandidate, TriageDecision, TriageResult } from "@/data/anytrace";
-import { isAnytraceDemoMode } from "@/lib/demoMode";
+} from "@/hooks/useTraqr";
+import type { TriageAgentLogEntry, TriageCandidate, TriageDecision, TriageResult } from "@/data/traqr";
 
 function formatTime(value?: string | null) {
   if (!value) return "Not run yet";
@@ -34,17 +27,6 @@ function formatTime(value?: string | null) {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
-}
-
-function formatCliTime(value?: string | null) {
-  if (!value) return "--:--:--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--:--:--";
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
   }).format(date);
 }
 
@@ -68,197 +50,7 @@ function decisionTone(value: TriageDecision) {
   return "border-border bg-surface-sunken text-muted-foreground";
 }
 
-type CliLogLevel = "info" | "pending" | "success" | "error";
 type TriageProfile = Partial<TriageCandidate & TriageResult>;
-type PipelinePhase = "idle" | "seed_scan" | "seed_wait" | "linkedin" | "triage" | "complete" | "error";
-
-interface CliLogEntry {
-  timestamp: string;
-  command: string;
-  message: string;
-  level: CliLogLevel;
-}
-
-function cliLevelTone(level: CliLogLevel) {
-  if (level === "success") return "text-emerald-300";
-  if (level === "pending") return "text-amber-300";
-  if (level === "error") return "text-red-300";
-  return "text-sky-300";
-}
-
-function cliLevelForAgentStage(stage: string): CliLogLevel {
-  const normalized = stage.toLowerCase();
-  if (normalized.includes("error") || normalized.includes("failed")) return "error";
-  if (
-    normalized.includes("persist") ||
-    normalized.includes("completed") ||
-    normalized.includes("loaded") ||
-    normalized.includes("resolved") ||
-    normalized.includes("extract") ||
-    normalized.includes("selection") ||
-    normalized.includes("filter")
-  ) {
-    return "success";
-  }
-  if (normalized.includes("open") || normalized.includes("resolve") || normalized.includes("scrape") || normalized.includes("model")) return "pending";
-  return "info";
-}
-
-function cliCommandForAgentStage(stage: string) {
-  const normalized = stage.toLowerCase();
-  if (normalized.includes("seed") || normalized.includes("threshold")) {
-    return `seed:${stage}`;
-  }
-  if (normalized.includes("x_connection") || normalized.includes("x_follow")) {
-    return `x:${stage}`;
-  }
-  if (normalized.includes("github") || normalized === "builder") {
-    return `github:${stage}`;
-  }
-  if (normalized.includes("linkedin") || normalized.includes("profile") || normalized.includes("browser") || normalized.includes("auth")) {
-    return `linkedin:${stage}`;
-  }
-  if (
-    normalized.includes("url_") ||
-    normalized === "x_profile_cache" ||
-    normalized === "candidate_pool" ||
-    normalized === "candidate_filter" ||
-    normalized === "target_selection" ||
-    normalized === "run_start" ||
-    normalized.includes("scrape") ||
-    normalized.includes("persist")
-  ) {
-    return `linkedin:${stage}`;
-  }
-  return `agent:${stage}`;
-}
-
-const SEED_SCAN_TIMEOUT_MS = 180_000;
-const SEED_SCAN_POLL_MS = 3_000;
-
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function seedScanProgress(status?: SeedScanStatus | null) {
-  const count = Math.max(0, Number(status?.count ?? 0));
-  const total = Math.max(0, Number(status?.total ?? status?.limit ?? 0));
-  const remaining = Math.max(0, Number(status?.remaining ?? (total > 0 ? total - count : 0)));
-  return {
-    count,
-    total,
-    remaining,
-    currentAccount: status?.currentAccount || null,
-    currentHandle: status?.currentHandle || null,
-    lastCompletedAccount: status?.lastCompletedAccount || null,
-  };
-}
-
-function seedScanProgressText(status?: SeedScanStatus | null) {
-  const progress = seedScanProgress(status);
-  const base = progress.total > 0
-    ? `${progress.count}/${progress.total} seed accounts scanned, ${progress.remaining} remaining`
-    : `${progress.count} seed accounts scanned`;
-  if (progress.currentAccount) {
-    const handle = progress.currentHandle ? ` (${progress.currentHandle})` : "";
-    return `${base}; now scanning ${progress.currentAccount}${handle}.`;
-  }
-  if (progress.lastCompletedAccount && progress.remaining > 0) {
-    return `${base}; last completed ${progress.lastCompletedAccount}.`;
-  }
-  return `${base}.`;
-}
-
-function CliUpdateLog({ entries, statusLabel }: { entries: CliLogEntry[]; statusLabel: string }) {
-  const [open, setOpen] = useState(false);
-  const visibleEntries = entries;
-  let currentIndex = -1;
-  visibleEntries.forEach((entry, index) => {
-    if (entry.level === "pending") currentIndex = index;
-  });
-
-  return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className={`fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] ${open ? "max-w-[520px]" : "max-w-[310px]"}`}
-      data-testid="e2e-cli-update-log"
-    >
-      <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-white/95 text-slate-950 shadow-2xl shadow-slate-950/12 backdrop-blur-xl">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3.5 py-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-950 text-white">
-              <Terminal className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium">Anytrace.ai agent activity</div>
-              <div className="truncate text-xs text-slate-500">{statusLabel}</div>
-            </div>
-          </div>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-              aria-label={open ? "Collapse E2E update log" : "Expand E2E update log"}
-              data-testid="e2e-cli-update-log-toggle"
-            >
-              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-            </button>
-          </CollapsibleTrigger>
-        </div>
-
-        <CollapsibleContent>
-          <div
-            className="max-h-[340px] space-y-2 overflow-y-auto bg-slate-50/70 px-3 py-3 text-xs leading-5"
-            aria-live="polite"
-            data-testid="e2e-cli-update-log-lines"
-          >
-            {visibleEntries.map((entry, index) => {
-              const isCurrent = index === currentIndex;
-              return (
-                <div
-                  key={`${entry.timestamp}-${entry.command}-${index}`}
-                  className={`rounded-[18px] border bg-white px-3 py-2.5 shadow-sm transition ${
-                    isCurrent
-                      ? "e2e-log-current border-slate-300 shadow-slate-300/60"
-                      : entry.level === "error"
-                        ? "border-red-200 bg-red-50"
-                        : "border-slate-200"
-                  }`}
-                  data-testid="e2e-cli-update-log-line"
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        entry.level === "success"
-                          ? "bg-emerald-500"
-                          : entry.level === "error"
-                            ? "bg-red-500"
-                            : entry.level === "pending"
-                              ? "bg-slate-950"
-                              : "bg-sky-500"
-                      } ${isCurrent ? "animate-ping" : ""}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-[11px] text-slate-400">{formatCliTime(entry.timestamp)}</span>
-                        <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] ${cliLevelTone(entry.level)} bg-slate-950`}>
-                          {entry.level === "pending" ? "running" : entry.level}
-                        </span>
-                        <span className="truncate font-mono text-[11px] text-slate-500">{entry.command}</span>
-                      </div>
-                      <div className="mt-1 text-sm leading-6 text-slate-800">{entry.message}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  );
-}
 
 function sourceLabel(candidate: TriageCandidate) {
   const count = candidate.currentSeedFollowerCount;
@@ -361,7 +153,7 @@ function profileOverview(profile: TriageProfile) {
   ].filter(Boolean);
   return fragments.length
     ? fragments.join(" ")
-    : "Anytrace.ai has a signal cluster here, but founder and company context still need verification.";
+    : "traqr.ai has a signal cluster here, but founder and company context still need verification.";
 }
 
 function filterHandle(message: string) {
@@ -467,7 +259,7 @@ function AgentLog({ entries, running }: { entries: TriageAgentLogEntry[]; runnin
     ? [
         {
           stage: "system",
-          message: "Starting Anytrace.ai Featherless triage...",
+          message: "Starting traqr.ai Featherless triage...",
           timestamp: new Date().toISOString(),
         },
         {
@@ -845,135 +637,13 @@ function SignalsPanel({
 
 export default function TriagePage() {
   const { access } = useAccessState();
-  const demoMode = isAnytraceDemoMode();
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
-  const [pipelinePhase, setPipelinePhase] = useState<PipelinePhase>("idle");
-  const [pipelineStartedAt, setPipelineStartedAt] = useState<string | null>(null);
-  const [pipelineLinkedInLog, setPipelineLinkedInLog] = useState<TriageAgentLogEntry[]>([]);
   const [showResearchQueue, setShowResearchQueue] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const latestQuery = useLatestTriageRun(access.isAuthenticated);
-  const seedScanStatusQuery = useSeedScanStatus(access.isAuthenticated);
-  const runSeedScan = useRunTwitterScrape();
-  const runTriage = useRunTriage();
-  const runLinkedInEnrichment = useRunLinkedInEnrichment();
-  const seedScanStatus = seedScanStatusQuery.data?.scanStatus;
-  const seedProgress = seedScanProgress(seedScanStatus);
-  const seedScanInProgress = seedScanStatus?.status === "queued" || seedScanStatus?.status === "running";
-  const activeRun = runTriage.data ?? latestQuery.data;
-  const triageAgentLog = activeRun?.agentLog ?? [];
-  const linkedInRunLog = useMemo(
-    () => (pipelineLinkedInLog.length > 0 ? pipelineLinkedInLog : runLinkedInEnrichment.data?.agentLog || runLinkedInEnrichment.data?.agent_log || []),
-    [pipelineLinkedInLog, runLinkedInEnrichment.data?.agentLog, runLinkedInEnrichment.data?.agent_log],
-  );
-  const pipelineRunning =
-    pipelinePhase === "seed_scan" ||
-    pipelinePhase === "seed_wait" ||
-    pipelinePhase === "linkedin" ||
-    pipelinePhase === "triage" ||
-    seedScanInProgress ||
-    runSeedScan.isPending ||
-    runLinkedInEnrichment.isPending ||
-    runTriage.isPending;
-  const pipelineTimestamp = pipelineStartedAt || new Date().toISOString();
-  const seedScanPendingLog = useMemo(
-    () => [
-      {
-        stage: "seed_scan_start",
-        message: seedScanStatus?.status === "queued" ? "Queued X seed-source scan for curated investor and builder accounts." : "Starting X seed-source scan for curated investor and builder accounts.",
-        timestamp: pipelineTimestamp,
-      },
-      {
-        stage: "x_connections",
-        message: seedScanProgressText(seedScanStatus),
-        timestamp: pipelineTimestamp,
-      },
-      {
-        stage: "seed_threshold",
-        message: seedProgress.remaining > 0
-          ? "Building alert-qualified people as each scanned account updates the 3+ source threshold."
-          : "Seed-source scan finished; alert-qualified people are ready for LinkedIn and triage.",
-        timestamp: pipelineTimestamp,
-      },
-    ],
-    [pipelineTimestamp, seedProgress.remaining, seedScanStatus],
-  );
-  const linkedInPendingLog = useMemo(
-    () => [
-      {
-        stage: "run_start",
-        message: "Starting native LinkedIn enrichment for source-qualified profiles.",
-        timestamp: pipelineTimestamp,
-      },
-      {
-        stage: "candidate_pool",
-        message: "Loading 3+ source candidates for the founder pipeline.",
-        timestamp: pipelineTimestamp,
-      },
-      {
-        stage: "url_resolver",
-        message: "Resolving LinkedIn URLs from person records, prior enrichment, and X profile cache.",
-        timestamp: pipelineTimestamp,
-      },
-      {
-        stage: "open_profile",
-        message: "Opening known LinkedIn profiles or public metadata fallback.",
-        timestamp: pipelineTimestamp,
-      },
-    ],
-    [pipelineTimestamp],
-  );
-  const triagePendingLog = useMemo(
-    () => [
-      {
-        stage: "triage_collect",
-        message: "Collecting enriched candidates, Proof of Signal, and capital adjacency evidence.",
-        timestamp: new Date().toISOString(),
-      },
-      {
-        stage: "triage_filter",
-        message: "Removing obvious network magnets, VC partners, and public AI lab accounts from top picks.",
-        timestamp: new Date().toISOString(),
-      },
-      {
-        stage: "github",
-        message: "Attaching GitHub builder evidence without rewarding popularity alone.",
-        timestamp: new Date().toISOString(),
-      },
-      {
-        stage: "triage_model",
-        message: "Calling Featherless to classify founder fit and rank the shortlist.",
-        timestamp: new Date().toISOString(),
-      },
-    ],
-    [pipelinePhase],
-  );
-  const activeAgentLog = useMemo(() => {
-    if (runSeedScan.isPending || pipelinePhase === "seed_scan" || pipelinePhase === "seed_wait" || (pipelinePhase === "idle" && seedScanInProgress)) {
-      return seedScanPendingLog;
-    }
-    if (runLinkedInEnrichment.isPending) {
-      return linkedInPendingLog;
-    }
-    const entries: TriageAgentLogEntry[] = [];
-    if (linkedInRunLog.length > 0) entries.push(...linkedInRunLog);
-    if (runTriage.isPending) entries.push(...triagePendingLog);
-    if (runTriage.data?.agentLog?.length) entries.push(...runTriage.data.agentLog);
-    if (entries.length > 0) return entries;
-    return triageAgentLog;
-  }, [
-    linkedInPendingLog,
-    linkedInRunLog,
-    pipelinePhase,
-    runLinkedInEnrichment.isPending,
-    runSeedScan.isPending,
-    runTriage.data?.agentLog,
-    runTriage.isPending,
-    seedScanInProgress,
-    seedScanPendingLog,
-    triageAgentLog,
-    triagePendingLog,
-  ]);
+  const activeRun = latestQuery.data;
+  const triageAgentLog = useMemo(() => activeRun?.agentLog ?? [], [activeRun?.agentLog]);
+  const activeAgentLog = triageAgentLog;
   const filterLogEntries = useMemo(
     () => triageAgentLog.filter((entry) => entry.stage === "filter"),
     [triageAgentLog],
@@ -1001,267 +671,11 @@ export default function TriagePage() {
     });
     return rows;
   }, [rawCandidates]);
-  const researchCount = actionableResults.length;
-  const watchCount = watchResults.length;
-  const isLoading = latestQuery.isLoading && !runTriage.data;
+  const isLoading = latestQuery.isLoading;
   const errorMessage =
-    (runSeedScan.error as Error | null)?.message ||
-    (seedScanStatusQuery.error as Error | null)?.message ||
-    seedScanStatusQuery.data?.scanStatus?.error ||
-    (runLinkedInEnrichment.error as Error | null)?.message ||
-    (runTriage.error as Error | null)?.message ||
     (latestQuery.error as Error | null)?.message ||
     activeRun?.error ||
     null;
-  const waitForSeedScanCompletion = useCallback(async () => {
-    const deadline = Date.now() + SEED_SCAN_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-      const latestSeedScan = await seedScanStatusQuery.refetch();
-      const status = latestSeedScan.data?.scanStatus?.status;
-      if (status === "completed") {
-        return latestSeedScan.data;
-      }
-      if (status === "error") {
-        throw new Error(latestSeedScan.data?.scanStatus?.error || "Seed-source X scan failed.");
-      }
-      await wait(SEED_SCAN_POLL_MS);
-    }
-    throw new Error("Seed-source X scan did not finish within 3 minutes. Check the backend log and try again.");
-  }, [seedScanStatusQuery]);
-
-  const runAgentPipeline = useCallback(async () => {
-    setPipelineStartedAt(new Date().toISOString());
-    setPipelinePhase("seed_scan");
-    setPipelineLinkedInLog([]);
-    runSeedScan.reset();
-    runLinkedInEnrichment.reset();
-    runTriage.reset();
-    try {
-      await runSeedScan.mutateAsync();
-      setPipelinePhase("seed_wait");
-      await waitForSeedScanCompletion();
-      setPipelinePhase("linkedin");
-      const linkedInResult = await runLinkedInEnrichment.mutateAsync({ limit: 1, missingOnly: false });
-      setPipelineLinkedInLog(linkedInResult.agentLog || linkedInResult.agent_log || []);
-      setPipelinePhase("triage");
-      await runTriage.mutateAsync();
-      setPipelinePhase("complete");
-    } catch {
-      setPipelinePhase("error");
-    }
-  }, [runLinkedInEnrichment, runSeedScan, runTriage, waitForSeedScanCompletion]);
-  const pipelineButtonLabel = (() => {
-    if (!pipelineRunning) return pipelinePhase === "error" ? "Retry Full Pipeline" : "Run Full Pipeline";
-    if (pipelinePhase === "seed_scan" || pipelinePhase === "seed_wait" || runSeedScan.isPending || (pipelinePhase === "idle" && seedScanInProgress)) {
-      return "Scanning X connections...";
-    }
-    if (pipelinePhase === "triage" || runTriage.isPending) return "Ranking founder leads...";
-    return "Enriching LinkedIn context...";
-  })();
-  const cliEntries = useMemo<CliLogEntry[]>(() => {
-    const now = new Date().toISOString();
-    const rows: CliLogEntry[] = [
-      {
-        timestamp: activeRun?.startedAt || now,
-        command: "route /triage",
-        message: "Founder Pipeline mounted for E2E observation.",
-        level: "info",
-      },
-    ];
-
-    if (latestQuery.isLoading) {
-      rows.push({
-        timestamp: now,
-        command: "GET /triage/latest",
-        message: "Loading latest persisted Featherless run.",
-        level: "pending",
-      });
-    } else if (latestQuery.isError) {
-      rows.push({
-        timestamp: now,
-        command: "GET /triage/latest",
-        message: (latestQuery.error as Error | null)?.message || "Latest run request failed.",
-        level: "error",
-      });
-    } else {
-      rows.push({
-        timestamp: activeRun?.completedAt || activeRun?.startedAt || now,
-        command: "GET /triage/latest",
-        message: `${activeRun?.status || "empty"} run loaded with ${activeRun?.qualifiedCount ?? 0} qualified profiles and ${filterLogEntries.length} obvious magnets filtered.`,
-        level: "success",
-      });
-    }
-
-    if (pipelinePhase !== "idle") {
-      rows.push({
-        timestamp: pipelineStartedAt || now,
-        command: "agent pipeline",
-        message: "Single-click flow: X seed-source scan, LinkedIn context refresh, fit filtering, Featherless ranking, then UI render.",
-        level: pipelineRunning ? "pending" : pipelinePhase === "error" ? "error" : "success",
-      });
-    }
-
-    if (runSeedScan.isPending || pipelinePhase === "seed_scan" || pipelinePhase === "seed_wait" || (pipelinePhase === "idle" && seedScanInProgress)) {
-      rows.push({
-        timestamp: now,
-        command: "POST /run-twitter",
-        message: seedScanProgressText(seedScanStatus),
-        level: "pending",
-      });
-    }
-    if (runSeedScan.isSuccess && runSeedScan.data) {
-      rows.push({
-        timestamp: seedScanStatusQuery.data?.scanStatus?.startedAt || now,
-        command: "POST /run-twitter",
-        message: runSeedScan.data.message || `seed scan accepted for ${runSeedScan.data.limit ?? "configured"} seed sources.`,
-        level: "success",
-      });
-    }
-    if (pipelinePhase === "seed_wait") {
-      rows.push({
-        timestamp: now,
-        command: "GET /seed-scan/latest",
-        message: `waiting for X scan status=${seedScanStatus?.status || "queued"}; ${seedScanProgressText(seedScanStatus)}`,
-        level: "pending",
-      });
-    }
-    if (runSeedScan.isError) {
-      rows.push({
-        timestamp: now,
-        command: "POST /run-twitter",
-        message: (runSeedScan.error as Error | null)?.message || "Seed-source X scan failed to start.",
-        level: "error",
-      });
-    }
-
-    if (runLinkedInEnrichment.isPending) {
-      rows.push({
-        timestamp: now,
-        command: "POST /run-linkedin-enrichment",
-        message: "Resolving LinkedIn URLs and enriching source-qualified profiles.",
-        level: "pending",
-      });
-    }
-    if (runLinkedInEnrichment.isSuccess && runLinkedInEnrichment.data) {
-      rows.push({
-        timestamp: now,
-        command: "POST /run-linkedin-enrichment",
-        message: `processed=${runLinkedInEnrichment.data.processed} enriched=${runLinkedInEnrichment.data.enriched} skipped=${runLinkedInEnrichment.data.skipped}`,
-        level: "success",
-      });
-    }
-    if (runLinkedInEnrichment.isError) {
-      rows.push({
-        timestamp: now,
-        command: "POST /run-linkedin-enrichment",
-        message: (runLinkedInEnrichment.error as Error | null)?.message || "LinkedIn enrichment failed.",
-        level: "error",
-      });
-    }
-
-    if (runTriage.isPending) {
-      rows.push({
-        timestamp: now,
-        command: "POST /triage/run",
-        message: "Running 3+ source filter and Featherless founder triage.",
-        level: "pending",
-      });
-    }
-    if (runTriage.isSuccess && runTriage.data) {
-      rows.push({
-        timestamp: runTriage.data.completedAt || now,
-        command: "POST /triage/run",
-        message: `completed live triage with ${runTriage.data.results.length} ranked profiles.`,
-        level: "success",
-      });
-    }
-    if (runTriage.isError) {
-      rows.push({
-        timestamp: now,
-        command: "POST /triage/run",
-        message: (runTriage.error as Error | null)?.message || "Featherless triage failed.",
-        level: "error",
-      });
-    }
-
-    activeAgentLog.forEach((entry) => {
-      rows.push({
-        timestamp: entry.timestamp || now,
-        command: cliCommandForAgentStage(entry.stage),
-        message: entry.message,
-        level: cliLevelForAgentStage(entry.stage),
-      });
-    });
-
-    if (activeRun?.status === "completed") {
-      rows.push({
-        timestamp: activeRun.completedAt || now,
-        command: "render shortlist",
-        message: `${actionableResults.length} top picks and ${watchResults.length} watch profiles visible from ${rawCandidates.length} raw candidates.`,
-        level: "success",
-      });
-    }
-    if (errorMessage) {
-      rows.push({
-        timestamp: now,
-        command: "surface error",
-        message: errorMessage,
-        level: "error",
-      });
-    }
-
-    return rows;
-  }, [
-    activeAgentLog,
-    activeRun?.completedAt,
-    activeRun?.qualifiedCount,
-    activeRun?.startedAt,
-    activeRun?.status,
-    actionableResults.length,
-    errorMessage,
-    filterLogEntries.length,
-    latestQuery.error,
-    latestQuery.isError,
-    latestQuery.isLoading,
-    pipelinePhase,
-    pipelineRunning,
-    pipelineStartedAt,
-    rawCandidates.length,
-    runLinkedInEnrichment.data,
-    runLinkedInEnrichment.error,
-    runLinkedInEnrichment.isError,
-    runLinkedInEnrichment.isPending,
-    runLinkedInEnrichment.isSuccess,
-    runSeedScan.data,
-    runSeedScan.error,
-    runSeedScan.isError,
-    runSeedScan.isPending,
-    runSeedScan.isSuccess,
-    runTriage.data,
-    runTriage.error,
-    runTriage.isError,
-    runTriage.isPending,
-    runTriage.isSuccess,
-    seedScanInProgress,
-    seedScanStatus,
-    watchResults.length,
-  ]);
-  const cliStatusLabel = (() => {
-    if (pipelineRunning) {
-      if (pipelinePhase === "seed_scan" || pipelinePhase === "seed_wait" || runSeedScan.isPending || (pipelinePhase === "idle" && seedScanInProgress)) {
-        return seedProgress.total > 0
-          ? `scanning X connections: ${seedProgress.count}/${seedProgress.total}`
-          : "scanning X connections";
-      }
-      if (pipelinePhase === "seed_wait") return "waiting for seed scan";
-      if (pipelinePhase === "triage" || runTriage.isPending) return "ranking founders with Featherless";
-      return "refreshing LinkedIn context";
-    }
-    if (pipelinePhase === "complete") return "pipeline completed";
-    if (errorMessage) return "attention required";
-    if (activeRun?.status === "completed") return `${actionableResults.length} top picks ready`;
-    return "waiting for first run";
-  })();
 
   return (
     <ProductGate
@@ -1269,66 +683,10 @@ export default function TriagePage() {
       description="Top picks, evidence, filtering, and run log in one VC workflow."
     >
       <div className="mx-auto max-w-5xl px-4 pb-36 pt-6 md:px-8 md:pb-40 md:pt-8">
-        <section className="mb-4 overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
-          <div className="grid gap-5 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5" />
-                Anytrace.ai founder pipeline
-              </div>
-              <h1 className="max-w-3xl text-3xl font-medium md:text-4xl">Pre-seed founders before the market sees them.</h1>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                One click scans X seed-source follows, enriches LinkedIn context, attaches GitHub builder proof, filters obvious magnets, and asks Featherless for the founder shortlist.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 lg:min-w-[280px]">
-              <Button
-                type="button"
-                className="h-12 rounded-full px-5"
-                disabled={pipelineRunning}
-                onClick={runAgentPipeline}
-                data-testid="e2e-run-agent-pipeline-button"
-              >
-                <Sparkles className={`h-4 w-4 ${pipelineRunning ? "animate-pulse" : ""}`} />
-                {pipelineButtonLabel}
-              </Button>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-[18px] bg-slate-50 px-3 py-2">
-                  <div className="text-lg font-semibold">{researchCount}</div>
-                  <div className="text-[11px] text-muted-foreground">research</div>
-                </div>
-                <div className="rounded-[18px] bg-slate-50 px-3 py-2">
-                  <div className="text-lg font-semibold">{watchCount}</div>
-                  <div className="text-[11px] text-muted-foreground">watch</div>
-                </div>
-                <div className="rounded-[18px] bg-slate-50 px-3 py-2">
-                  <div className="text-lg font-semibold">{filterLogEntries.length}</div>
-                  <div className="text-[11px] text-muted-foreground">filtered</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-3 text-xs text-muted-foreground">
-            <span className="rounded-full bg-slate-50 px-3 py-1.5">Latest run: {formatTime(activeRun?.completedAt || activeRun?.startedAt)}</span>
-            <span className="rounded-full bg-slate-50 px-3 py-1.5">{activeRun?.qualifiedCount ?? 0} qualified profiles</span>
-            <span className="rounded-full bg-slate-50 px-3 py-1.5">Evidence, not scores</span>
-          </div>
-        </section>
-
         {errorMessage ? (
           <div className="mb-4 flex items-start gap-2 rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{errorMessage}</span>
-          </div>
-        ) : null}
-
-        {runLinkedInEnrichment.isSuccess && runLinkedInEnrichment.data ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[22px] border border-signal-linkedin/20 bg-signal-linkedin/5 px-4 py-3 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span>
-              LinkedIn refreshed: {runLinkedInEnrichment.data.enriched} enriched, {runLinkedInEnrichment.data.skipped} skipped.
-            </span>
-            {!demoMode && <span className="text-slate-400">Detailed steps are in the corner log.</span>}
           </div>
         ) : null}
 
@@ -1451,7 +809,7 @@ export default function TriagePage() {
                     <div className="min-w-0 rounded-[24px] bg-slate-50 p-3" data-testid="e2e-agent-log">
                       <div className="mb-3 px-1 text-sm font-semibold">Agent log</div>
                       <div className="max-h-[520px] overflow-y-auto pr-1">
-                        <AgentLog entries={activeAgentLog} running={runTriage.isPending} />
+                        <AgentLog entries={activeAgentLog} running={false} />
                       </div>
                     </div>
                   </div>
@@ -1461,7 +819,6 @@ export default function TriagePage() {
           </div>
         )}
       </div>
-      {!demoMode && <CliUpdateLog entries={cliEntries} statusLabel={cliStatusLabel} />}
     </ProductGate>
   );
 }

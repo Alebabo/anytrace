@@ -155,7 +155,7 @@ def build_linkedin_make_batch(
         callback_url = f"{settings.public_api_base_url}/linkedin-make/ingest"
 
     return {
-        "source": "anytrace",
+        "source": "traqr",
         "kind": "linkedin_enrichment_request",
         "sentAt": _utc_now_iso(),
         "callbackUrl": callback_url,
@@ -192,7 +192,7 @@ def trigger_linkedin_make(
 
     headers = {"Content-Type": "application/json"}
     if resolved_settings.make_linkedin_webhook_secret:
-        headers["X-Anytrace-Secret"] = resolved_settings.make_linkedin_webhook_secret
+        headers["X-Traqr-Secret"] = resolved_settings.make_linkedin_webhook_secret
 
     response = requests.post(
         resolved_settings.make_linkedin_webhook_url,

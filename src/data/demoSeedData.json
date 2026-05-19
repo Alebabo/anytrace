@@ -86369,7 +86369,7 @@
     "agentLog": [
       {
         "stage": "snapshot",
-        "message": "Loaded public-safe demo snapshot from local Anytrace data.",
+        "message": "Loaded public-safe demo snapshot from local traqr.ai data.",
         "timestamp": "2026-05-15T09:00:00+00:00"
       },
       {

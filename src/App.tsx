@@ -5,10 +5,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import AppLayout from "@/components/anytrace/AppLayout";
+import AppLayout from "@/components/traqr/AppLayout";
 
 const MainDashboard = lazy(() => import("@/pages/Index"));
 const TriagePage = lazy(() => import("@/pages/Triage"));
+const AgentSwarmPage = lazy(() => import("@/pages/AgentSwarm"));
 const GraphPage = lazy(() => import("@/pages/Explore"));
 const ActivitiesPage = lazy(() => import("@/pages/Activities"));
 const WatchlistPage = lazy(() => import("@/pages/Watchlist"));
@@ -45,6 +46,7 @@ const App = () => (
       <BrowserRouter>
         <Suspense fallback={<AppFallback />}>
           <Routes>
+            <Route path="/agent-swarm" element={<AgentSwarmPage />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/triage" replace />} />
               <Route path="/seed-scan" element={<MainDashboard />} />

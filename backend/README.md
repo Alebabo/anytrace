@@ -1,6 +1,6 @@
-# Anytrace Backend
+# traqr.ai Backend
 
-Python backend for seed-source signal aggregation across Twitter/X, GitHub and LinkedIn, plus the Anytrace.ai Featherless triage agent.
+Python backend for seed-source signal aggregation across Twitter/X, GitHub and LinkedIn, plus the traqr.ai Featherless triage agent.
 
 ## Setup
 
@@ -13,7 +13,7 @@ playwright install chromium
 
 ## Local storage
 
-- Main backend database: `backend/local_data/anytrace.db`
+- Main backend database: `backend/local_data/traqr.db`
 - Twitter snapshot state: `backend/local_data/twitter_state.db`
 - Seed sources are imported automatically from `src/data/localSeedData.json`
 
@@ -32,7 +32,7 @@ python -m backend.main scheduler
 python -m backend.main serve-api
 ```
 
-## Anytrace.ai Featherless triage
+## traqr.ai Featherless triage
 
 The triage agent filters alert-qualified profiles at the 3+ source threshold, builds an evidence payload, calls Featherless through its OpenAI-compatible API, and stores the latest run in SQLite.
 
@@ -81,7 +81,7 @@ When `LI_USERNAME` / `LI_PASSWORD` are not configured, known LinkedIn URLs use a
 
 ## Notes
 
-- Twitter/X scraping uses your own Playwright script in [scrape_following.py](C:/Users/User/IdeaProjects/anytrace/scrape_following.py).
+- Twitter/X scraping uses your own Playwright script in [scrape_following.py](../scrape_following.py).
 - `TWEETAPI_KEY` is the only required X API key when you run the hosted API-based X flow.
 - TweetAPI scans fetch at least `TWEETAPI_INCREMENTAL_MIN_PAGES` pages before stopping at the last known handle, and run a deeper `TWEETAPI_MAX_PAGES` pass every `TWEETAPI_DEEP_SCAN_INTERVAL_HOURS` hours.
 - GitHub-to-X relationship verification reuses the same `TweetAPI` following endpoints instead of a second X provider.

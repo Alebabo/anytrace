@@ -15,11 +15,11 @@ from backend.engine.triage_engine import TriageEngine, _extract_json_object
 class TriageEngineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.db = SupabaseDB(Path(self.temp_dir.name) / "anytrace-test.db")
+        self.db = SupabaseDB(Path(self.temp_dir.name) / "traqr-test.db")
         self.db.set_seed_follow_alert_threshold(3)
         self.settings = replace(
             get_settings(),
-            local_db_path=str(Path(self.temp_dir.name) / "anytrace-test.db"),
+            local_db_path=str(Path(self.temp_dir.name) / "traqr-test.db"),
             featherless_triage_mock=True,
             featherless_api_key="",
             featherless_triage_model="test/mock-model",

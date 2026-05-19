@@ -70,12 +70,16 @@ class Settings:
     linkedin_headless: bool
     linkedin_scrape_batch_limit: int
     linkedin_public_scrape: bool
+    crunchbase_api_key: str
+    agent_swarm_seed_limit: int
+    agent_swarm_tweetapi_page_size: int
+    agent_swarm_tweetapi_max_pages: int
 
 
 def validate_settings(settings: Settings, *scopes: str) -> None:
     required_by_scope = {
         "supabase": {
-            "ANYTRACE_LOCAL_DB_PATH": settings.local_db_path,
+            "TRAQR_LOCAL_DB_PATH": settings.local_db_path,
         },
         "twitter": {
             "TWITTER_USERNAME": settings.twitter_username,
@@ -111,7 +115,7 @@ def get_settings() -> Settings:
     return Settings(
         supabase_url=_env("SUPABASE_URL", ""),
         supabase_key=_env("SUPABASE_KEY", ""),
-        local_db_path=_env("ANYTRACE_LOCAL_DB_PATH", "backend/local_data/anytrace.db").strip(),
+        local_db_path=_env("TRAQR_LOCAL_DB_PATH", "backend/local_data/traqr.db").strip(),
         twitter_provider=_env("TWITTER_PROVIDER", "auto").strip().lower(),
         twitter_state_backend=_env("TWITTER_STATE_BACKEND", "local").strip().lower(),
         twitter_local_db_path=_env("TWITTER_LOCAL_DB_PATH", "backend/local_data/twitter_state.db").strip(),
@@ -153,7 +157,7 @@ def get_settings() -> Settings:
         make_linkedin_webhook_url=_env("MAKE_LINKEDIN_WEBHOOK_URL", "").strip(),
         make_linkedin_webhook_secret=_env("MAKE_LINKEDIN_WEBHOOK_SECRET", _env("LINKEDIN_MAKE_WEBHOOK_SECRET", "")).strip(),
         make_linkedin_batch_limit=int(_env("MAKE_LINKEDIN_BATCH_LIMIT", "25")),
-        public_api_base_url=_env("ANYTRACE_PUBLIC_API_BASE_URL", "").strip().rstrip("/"),
+        public_api_base_url=_env("TRAQR_PUBLIC_API_BASE_URL", "").strip().rstrip("/"),
         seed_follow_alert_threshold=int(_env("SEED_FOLLOW_ALERT_THRESHOLD", "3")),
         featherless_api_key=_env("FEATHERLESS_API_KEY", "").strip(),
         featherless_base_url=_env("FEATHERLESS_BASE_URL", "https://api.featherless.ai/v1").strip().rstrip("/"),
@@ -166,4 +170,8 @@ def get_settings() -> Settings:
         linkedin_headless=_env("LINKEDIN_HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"},
         linkedin_scrape_batch_limit=max(1, int(_env("LINKEDIN_SCRAPE_BATCH_LIMIT", "10"))),
         linkedin_public_scrape=_env("LINKEDIN_PUBLIC_SCRAPE", "true").strip().lower() in {"1", "true", "yes", "on"},
+        crunchbase_api_key=_env("CRUNCHBASE_API_KEY", "").strip(),
+        agent_swarm_seed_limit=max(1, int(_env("AGENT_SWARM_SEED_LIMIT", "3"))),
+        agent_swarm_tweetapi_page_size=max(1, int(_env("AGENT_SWARM_TWEETAPI_PAGE_SIZE", "25"))),
+        agent_swarm_tweetapi_max_pages=max(1, int(_env("AGENT_SWARM_TWEETAPI_MAX_PAGES", "1"))),
     )

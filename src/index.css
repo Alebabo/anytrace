@@ -4,10 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Anytrace brand system */
+/* traqr.ai brand system */
 @layer base {
   :root {
-    /* Light Anytrace palette */
+    /* Light traqr.ai palette */
     --background: 0 0% 100%;
     --foreground: 174 50% 8%;
 
@@ -134,39 +134,51 @@
     background: hsl(var(--border));
   }
 
-  .anytrace-graph-flow .react-flow__background {
+  .traqr-graph-flow .react-flow__background {
     z-index: 0;
   }
 
-  .anytrace-graph-flow .react-flow__edges {
+  .traqr-graph-flow .react-flow__edges {
     z-index: 1;
     pointer-events: none;
   }
 
-  .anytrace-graph-flow .react-flow__edge {
+  .traqr-graph-flow .react-flow__edge {
     pointer-events: none;
   }
 
-  .anytrace-graph-flow .react-flow__nodes {
+  .traqr-graph-flow .react-flow__nodes {
     z-index: 2;
   }
 
-  .anytrace-graph-flow .react-flow__node {
+  .traqr-graph-flow .react-flow__node {
     z-index: 2 !important;
   }
 
   .e2e-log-current {
-    animation: anytrace-log-flicker 1.15s ease-in-out infinite;
+    animation: traqr-log-flicker 1.15s ease-in-out infinite;
+  }
+
+  .agent-swarm-node-active {
+    animation: agent-swarm-glow 0.8s ease-in-out infinite;
+  }
+
+  .agent-swarm-edge-active {
+    animation: agent-swarm-edge 0.9s ease-in-out infinite;
+  }
+
+  .agent-swarm-packet {
+    filter: drop-shadow(0 0 5px rgb(16 185 129 / 0.75));
   }
 }
 
 @layer utilities {
   .float-slow {
-    animation: anytrace-float 11s ease-in-out infinite;
+    animation: traqr-float 11s ease-in-out infinite;
   }
 
   .float-slower {
-    animation: anytrace-float 14s ease-in-out infinite;
+    animation: traqr-float 14s ease-in-out infinite;
     animation-delay: -4s;
   }
 
@@ -175,7 +187,7 @@
   }
 }
 
-@keyframes anytrace-float {
+@keyframes traqr-float {
   0%, 100% {
     transform: translate3d(0, 0, 0);
   }
@@ -185,7 +197,7 @@
   }
 }
 
-@keyframes anytrace-log-flicker {
+@keyframes traqr-log-flicker {
   0%, 100% {
     background: hsl(0 0% 100%);
     box-shadow: 0 1px 2px hsl(174 30% 10% / 0.05);
@@ -194,5 +206,1111 @@
   45% {
     background: hsl(50 95% 96%);
     box-shadow: 0 10px 30px -18px hsl(174 60% 12% / 0.55);
+  }
+}
+
+@keyframes agent-swarm-glow {
+  0%, 100% {
+    box-shadow: 0 0 16px rgb(16 185 129 / 0.25);
+  }
+
+  50% {
+    box-shadow: 0 0 38px rgb(16 185 129 / 0.7);
+  }
+}
+
+@keyframes agent-swarm-edge {
+  0%, 100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.voice-swarm-page {
+  width: min(1480px, 100%);
+  height: 100svh;
+  min-height: min(620px, 100svh);
+  overflow: hidden;
+  margin: 0 auto;
+  padding: clamp(8px, 1.6vw, 14px);
+  color: #030303;
+  background: #ffffff;
+}
+
+body:has(.voice-swarm-page) {
+  background: #ffffff;
+}
+
+.voice-swarm-page button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.voice-swarm-page button:disabled {
+  cursor: wait;
+  opacity: 1;
+}
+
+.swarm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 390px);
+  gap: clamp(8px, 1.1vw, 14px);
+  height: 100%;
+  min-height: 0;
+  margin-top: 0;
+}
+
+.swarm-stage {
+  position: relative;
+  min-height: 0;
+  height: 100%;
+  inline-size: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.standby-toggle {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  color: #030303;
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: 0 12px 28px #d9d9d9;
+}
+
+.standby-toggle:hover,
+.standby-toggle:focus-visible {
+  outline: 0;
+  color: #ffffff;
+  background: #030303;
+}
+
+.standby-toggle.active {
+  color: #ffffff;
+  background: #14843f;
+  border-color: #35e06f;
+  box-shadow: 0 0 0 2px #030303, 0 0 22px #35e06f, 0 12px 28px #d9d9d9;
+}
+
+.swarm-info-popup {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 40;
+  width: min(360px, calc(100% - 28px));
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  border: 1px solid #030303;
+  border-radius: 10px;
+  color: #030303;
+  background: #ffffff;
+  padding: 10px 12px;
+  box-shadow: 0 16px 34px #d9d9d9;
+  transform: translateX(-50%);
+}
+
+.swarm-info-popup span {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #030303;
+  font-size: 13px;
+  font-weight: 950;
+  font-style: italic;
+}
+
+.swarm-info-popup p {
+  color: #030303;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.swarm-powered-by {
+  position: fixed;
+  left: clamp(10px, 1.6vw, 18px);
+  bottom: clamp(8px, 1.4vw, 14px);
+  z-index: 30;
+  display: flex;
+  max-width: calc(100vw - 20px);
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d7d7d7;
+  border-radius: 999px;
+  color: #030303;
+  background: rgb(255 255 255 / 0.92);
+  padding: 5px 9px;
+  font-size: clamp(9px, 0.85vw, 11px);
+  font-weight: 850;
+  line-height: 1;
+  text-transform: lowercase;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.09);
+  backdrop-filter: blur(8px);
+}
+
+.swarm-powered-by img {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.swarm-powered-by strong,
+.swarm-powered-by span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swarm-telegram-button {
+  position: fixed;
+  right: clamp(10px, 1.6vw, 18px);
+  bottom: clamp(8px, 1.4vw, 14px);
+  z-index: 35;
+  display: inline-flex;
+  min-height: clamp(44px, 4.4vw, 54px);
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #229ed9;
+  padding: 0 clamp(15px, 1.5vw, 20px) 0 8px;
+  font-size: clamp(11px, 1vw, 13px);
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 2px #030303, 0 14px 32px rgb(34 158 217 / 0.34), 0 22px 42px rgb(0 0 0 / 0.16);
+  animation: telegramButtonPulse 1.9s ease-in-out infinite;
+}
+
+.swarm-telegram-button:hover,
+.swarm-telegram-button:focus-visible {
+  outline: 0;
+  background: #030303;
+  animation: none;
+  transform: translateY(-1px);
+}
+
+.telegram-button-icon {
+  display: grid;
+  width: clamp(30px, 3.2vw, 38px);
+  height: clamp(30px, 3.2vw, 38px);
+  place-items: center;
+  border-radius: 50%;
+  color: #229ed9;
+  background: #ffffff;
+  font-size: clamp(10px, 0.9vw, 12px);
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.telegram-button-icon img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.swarm-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.swarm-lines path {
+  fill: none;
+  stroke: #030303;
+  opacity: 0.24;
+  stroke-linecap: round;
+  stroke-width: 0.95;
+  vector-effect: non-scaling-stroke;
+}
+
+.swarm-lines g.active path {
+  stroke: #35e06f;
+  stroke-width: 1.3;
+  opacity: 1;
+}
+
+.swarm-lines .packet {
+  opacity: 0;
+  fill: #35e06f;
+}
+
+.swarm-lines g.active .packet {
+  opacity: 1;
+}
+
+.voice-orb-large {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(116px, min(15vw, 21vh), 168px);
+  height: clamp(116px, min(15vw, 21vh), 168px);
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #030303;
+  border: 0;
+  background: #ffffff;
+  padding: 0;
+  cursor: pointer;
+}
+
+.voice-orb-large:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 8px;
+}
+
+.orb-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #030303;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 8px #ffffff;
+}
+
+.voice-orb-large.orchestrating .orb-ring {
+  border-color: #030303;
+  box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 8px #ffffff, 0 0 24px #d9d9d9;
+  animation: orbPulse 1.2s ease-in-out infinite;
+}
+
+.voice-orb-large.standby .orb-ring {
+  border-color: #030303;
+  box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 8px #ffffff, 0 0 24px #d9d9d9;
+}
+
+.orb-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 18px;
+  text-align: center;
+}
+
+.swarm-center-logo {
+  width: clamp(64px, min(8.2vw, 11.5vh), 92px);
+  height: clamp(64px, min(8.2vw, 11.5vh), 92px);
+  border-radius: clamp(15px, 1.7vw, 22px);
+  object-fit: contain;
+  filter: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.orb-content strong {
+  font-size: 19px;
+}
+
+.orb-content span {
+  max-width: 150px;
+  color: #232323;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.swarm-agent-card {
+  position: absolute;
+  width: clamp(82px, min(10.8vw, 15.5vh), 122px);
+  height: clamp(82px, min(10.8vw, 15.5vh), 122px);
+  min-height: clamp(82px, min(10.8vw, 15.5vh), 122px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: clamp(2px, 0.45vw, 4px);
+  border: 1px solid #ffffff;
+  border-radius: 50%;
+  padding: clamp(7px, 1vw, 12px);
+  color: #ffffff;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 14px 30px #d9d9d9;
+}
+
+.swarm-agent-card.selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px #030303, 0 14px 30px #d9d9d9;
+}
+
+.swarm-agent-card.manager {
+  left: 50%;
+  top: 14%;
+}
+
+.swarm-agent-card.finder {
+  left: 18%;
+  top: 36%;
+}
+
+.swarm-agent-card.qualification {
+  left: 24%;
+  top: 78%;
+}
+
+.swarm-agent-card.feasibility {
+  left: 76%;
+  top: 36%;
+}
+
+.swarm-agent-card.ghosting {
+  left: 82%;
+  top: 78%;
+}
+
+.swarm-agent-card.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px #030303, 0 0 24px #35e06f, 0 16px 34px #d9d9d9;
+  animation: activeAgentHalo 1.25s ease-in-out infinite;
+}
+
+.swarm-agent-card.success {
+  box-shadow: 0 0 0 2px #35e06f, 0 14px 30px #d9d9d9;
+}
+
+.swarm-agent-card.error {
+  box-shadow: 0 0 0 2px #a96914, 0 14px 30px #d9d9d9;
+}
+
+.swarm-agent-card.brand-x {
+  background: #000000;
+}
+
+.swarm-agent-card.brand-linkedin {
+  background: #0a66c2;
+}
+
+.swarm-agent-card.brand-github {
+  background: #24292f;
+}
+
+.swarm-agent-card.brand-crunchbase {
+  background: #146aff;
+}
+
+.swarm-agent-card.brand-featherless {
+  background: #14843f;
+}
+
+.swarm-agent-icon {
+  width: clamp(26px, min(3vw, 4.2vh), 34px);
+  height: clamp(26px, min(3vw, 4.2vh), 34px);
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.swarm-agent-icon svg {
+  width: clamp(20px, min(2.5vw, 3.5vh), 28px);
+  height: clamp(20px, min(2.5vw, 3.5vh), 28px);
+}
+
+.brand-letters {
+  font-size: 18px;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.swarm-agent-card strong {
+  max-width: calc(100% - 10px);
+  color: #ffffff;
+  font-size: clamp(9px, min(1vw, 1.45vh), 11px);
+  line-height: 1.2;
+}
+
+.swarm-agent-card small {
+  max-width: calc(100% - 8px);
+  display: -webkit-box;
+  overflow: hidden;
+  color: #f1fff5;
+  font-size: clamp(7px, min(0.78vw, 1.15vh), 9px);
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agent-status-flag {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid #ffffff;
+  padding: clamp(2px, 0.35vw, 3px) clamp(5px, 0.6vw, 7px);
+  color: #030303;
+  background: #ffffff;
+  font-size: clamp(6px, min(0.7vw, 1vh), 8px);
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.swarm-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  border: 1px solid #123322;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+  scrollbar-color: #030303 #ffffff;
+  scrollbar-width: thin;
+}
+
+.side-panel {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: visible;
+  border: 1px solid #ffffff;
+  border-radius: 8px;
+  color: #030303;
+  background: #ffffff;
+  box-shadow: 0 18px 42px #d9d9d9;
+  padding: 12px;
+}
+
+.swarm-top-picks-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.side-head h2 {
+  color: #030303;
+  font-size: 15px;
+}
+
+.side-head span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #ffffff;
+  background: #030303;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.manager-context {
+  color: #333333;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.source-drawer {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-swarm-page .source-drawer-toggle {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  color: #030303;
+  background: #ffffff;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+
+.source-drawer-toggle strong {
+  border-radius: 999px;
+  border: 1px solid #030303;
+  padding: 3px 7px;
+  color: #030303;
+  background: #ffffff;
+  font-size: 9px;
+}
+
+.source-drawer-body {
+  display: grid;
+  gap: 8px;
+}
+
+.manager-task-list {
+  display: grid;
+  gap: 2px;
+  max-height: none;
+  overflow-y: auto;
+  padding: 2px 3px 2px 0;
+  scrollbar-color: #030303 #ffffff;
+  scrollbar-width: thin;
+}
+
+.manager-task-list article {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  padding: 5px 4px;
+}
+
+.manager-task-list article > span {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: #2f5f3e;
+  background: #111111;
+  box-shadow: none;
+  font-size: 0;
+}
+
+.manager-task-list article.running > span {
+  background: #111111;
+  box-shadow: 0 0 0 3px #d9d9d9;
+}
+
+.manager-task-list article.done > span {
+  background: #111111;
+  box-shadow: 0 0 0 3px #35e06f;
+}
+
+.manager-task-list strong {
+  display: block;
+  color: #030303;
+  font-size: 11px;
+  line-height: 1.15;
+}
+
+.manager-task-list p {
+  margin-top: 2px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #555555;
+  font-size: 10px;
+  line-height: 1.24;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.swarm-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid #030303;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #030303;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.swarm-pick-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 3px;
+  scrollbar-color: #030303 #ffffff;
+  scrollbar-width: thin;
+}
+
+.swarm-top-pick {
+  display: grid;
+  gap: 0;
+  border: 1px solid #d7d7d7;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.swarm-top-pick.expanded {
+  gap: 8px;
+  padding: 10px;
+}
+
+.voice-swarm-page .pick-head {
+  display: grid;
+  grid-template-columns: 28px 42px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voice-swarm-page .pick-head:hover,
+.voice-swarm-page .pick-head:focus-visible {
+  outline: 0;
+  background: #f7f7f7;
+}
+
+.pick-rank {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #030303;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.pick-avatar {
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid #030303;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #030303;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pick-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pick-title {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pick-title strong {
+  overflow: hidden;
+  color: #030303;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick-title small {
+  overflow: hidden;
+  color: #545454;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick-expand-indicator {
+  border-radius: 999px;
+  border: 1px solid #030303;
+  color: #030303;
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pick-details {
+  display: grid;
+  gap: 8px;
+}
+
+.swarm-top-pick p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #333333;
+  font-size: 11px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.pick-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pick-meta span,
+.pick-context span {
+  border-radius: 999px;
+  border: 1px solid #030303;
+  color: #030303;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.pick-evidence {
+  display: grid;
+  gap: 5px;
+}
+
+.pick-evidence div {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 6px;
+  color: #030303;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.pick-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.pick-context strong {
+  width: 100%;
+  color: #030303;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.swarm-empty-picks {
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #d7d7d7;
+  border-radius: 12px;
+  color: #555555;
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+@keyframes orbPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes activeAgentHalo {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px #030303,
+      0 0 0 5px #0c3c20,
+      0 16px 34px #d9d9d9;
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 4px #35e06f,
+      0 0 0 8px #030303,
+      0 16px 34px #d9d9d9;
+  }
+}
+
+@keyframes telegramButtonPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #030303, 0 14px 32px rgb(34 158 217 / 0.34), 0 22px 42px rgb(0 0 0 / 0.16);
+  }
+
+  50% {
+    box-shadow: 0 0 0 2px #030303, 0 0 0 7px rgb(34 158 217 / 0.22), 0 18px 42px rgb(34 158 217 / 0.42), 0 26px 48px rgb(0 0 0 / 0.18);
+  }
+}
+
+@media (max-width: 940px) {
+  .voice-swarm-page {
+    width: 100%;
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
+    padding: clamp(8px, 2.6vw, 12px);
+    color: #030303;
+  }
+
+  .swarm-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+    gap: 14px;
+  }
+
+  .swarm-stage {
+    min-height: 0;
+    height: clamp(420px, 78vw, 560px);
+    display: block;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .swarm-lines {
+    display: block;
+  }
+
+  .voice-orb-large,
+  .swarm-agent-card {
+    position: absolute;
+    inset: auto;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+  }
+
+  .swarm-agent-card.manager,
+  .swarm-agent-card.finder,
+  .swarm-agent-card.qualification,
+  .swarm-agent-card.feasibility,
+  .swarm-agent-card.ghosting {
+    right: auto;
+    bottom: auto;
+  }
+
+  .voice-orb-large {
+    left: 50%;
+    top: 50%;
+    width: clamp(136px, 38vw, 156px);
+    height: clamp(136px, 38vw, 156px);
+    margin: 0;
+  }
+
+  .orb-content {
+    gap: 0;
+    padding: 14px;
+  }
+
+  .swarm-center-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 18px;
+  }
+
+  .swarm-agent-card {
+    width: clamp(86px, 20vw, 108px);
+    height: clamp(86px, 20vw, 108px);
+    min-height: clamp(86px, 20vw, 108px);
+    margin: 0;
+    gap: 2px;
+    padding: 8px;
+  }
+
+  .swarm-agent-card.manager {
+    left: 50%;
+    top: 14%;
+  }
+
+  .swarm-agent-card.finder {
+    left: 18%;
+    top: 36%;
+  }
+
+  .swarm-agent-card.qualification {
+    left: 24%;
+    top: 78%;
+  }
+
+  .swarm-agent-card.feasibility {
+    left: 76%;
+    top: 36%;
+  }
+
+  .swarm-agent-card.ghosting {
+    left: 82%;
+    top: 78%;
+  }
+
+  .swarm-agent-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .swarm-agent-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .brand-letters {
+    font-size: 15px;
+  }
+
+  .swarm-agent-card strong {
+    max-width: 76px;
+    font-size: 10px;
+  }
+
+  .swarm-agent-card small {
+    max-width: 78px;
+    font-size: 8px;
+  }
+
+  .agent-status-flag {
+    padding: 2px 6px;
+    font-size: 7px;
+  }
+
+  .swarm-side {
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 10px;
+  }
+
+  .side-panel {
+    min-height: 0;
+  }
+
+  .standby-toggle {
+    top: 12px;
+    right: 12px;
+  }
+}
+
+@media (max-width: 1120px) and (min-width: 941px) {
+  .swarm-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 30vw, 340px);
+  }
+
+  .pick-expand-indicator {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .voice-swarm-page {
+    padding: 8px;
+  }
+
+  .swarm-stage {
+    height: clamp(330px, 104vw, 430px);
+    min-height: 0;
+  }
+
+  .swarm-powered-by {
+    max-width: calc(100vw - 16px);
+    gap: 5px;
+    padding: 5px 7px;
+  }
+
+  .swarm-telegram-button {
+    min-height: 42px;
+    padding-right: 11px;
+    gap: 7px;
+  }
+
+  .voice-orb-large {
+    width: clamp(112px, 32vw, 128px);
+    height: clamp(112px, 32vw, 128px);
+  }
+
+  .swarm-center-logo {
+    width: 66px;
+    height: 66px;
+    border-radius: 15px;
+  }
+
+  .swarm-agent-card {
+    width: clamp(66px, 18vw, 78px);
+    height: clamp(66px, 18vw, 78px);
+    min-height: clamp(66px, 18vw, 78px);
+    gap: 2px;
+    padding: 5px;
+  }
+
+  .swarm-agent-card strong {
+    max-width: 66px;
+    font-size: 9px;
+  }
+
+  .swarm-agent-card small {
+    max-width: 68px;
+    font-size: 7px;
+  }
+
+  .swarm-agent-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .swarm-agent-icon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .brand-letters {
+    font-size: 13px;
+  }
+
+  .agent-status-flag {
+    padding: 2px 5px;
+    font-size: 6px;
   }
 }

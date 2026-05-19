@@ -1,7 +1,7 @@
 import demoSeedData from "@/data/demoSeedData.json";
 import type {
   ActivityEvent,
-  AnytraceAppSettings,
+  TraqrAppSettings,
   GithubSignalProfile,
   GraphData,
   GraphEdge,
@@ -12,7 +12,7 @@ import type {
   TriageRun,
   VcSource,
   WeeklyPick,
-} from "@/data/anytrace";
+} from "@/data/traqr";
 
 export type DemoSeedPayload = {
   version: string;
@@ -25,7 +25,7 @@ export type DemoSeedPayload = {
   githubSignalProfiles: GithubSignalProfile[];
   graphEdges: GraphEdge[];
   graphSource: GraphData["graphSource"];
-  appSettings: AnytraceAppSettings;
+  appSettings: TraqrAppSettings;
   triageRun: TriageRun;
 };
 

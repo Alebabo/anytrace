@@ -1,7 +1,7 @@
-export function isAnytraceDemoMode() {
-  return import.meta.env.VITE_ANYTRACE_DEMO === "true";
+export function isTraqrDemoMode() {
+  return import.meta.env.VITE_TRAQR_DEMO === "true";
 }
 
-export function anytraceDemoLabel() {
-  return import.meta.env.VITE_ANYTRACE_DEMO_LABEL?.trim() || "";
+export function traqrDemoLabel() {
+  return import.meta.env.VITE_TRAQR_DEMO_LABEL?.trim() || "";
 }
