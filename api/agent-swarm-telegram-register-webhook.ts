@@ -1,6 +1,7 @@
 import { absoluteBaseUrl } from "./_telegram-agent-swarm.js";
+import type { ApiRequest, ApiResponse } from "./_telegram-agent-swarm.js";
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     res.status(405).json({ ok: false, error: "Method not allowed." });
     return;

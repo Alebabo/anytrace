@@ -7,6 +7,7 @@ import {
   wait,
   type TelegramPick,
 } from "./_telegram-agent-swarm.js";
+import type { ApiRequest, ApiResponse } from "./_telegram-agent-swarm.js";
 
 const require = createRequire(import.meta.url);
 const demoSeedData = require("../src/data/demoSeedData.json");
@@ -41,6 +42,13 @@ type DemoTriageResult = {
       stars?: number;
       starDelta7d?: number;
     }>;
+  };
+};
+
+type DemoSeedData = {
+  triageRun?: {
+    topPicks?: DemoTriageResult[];
+    results?: DemoTriageResult[];
   };
 };
 
@@ -83,7 +91,7 @@ function isFounderPick(pick: DemoTriageResult) {
 }
 
 function demoTelegramPicks(): TelegramPick[] {
-  const triageRun = (demoSeedData as any).triageRun || {};
+  const triageRun = (demoSeedData as DemoSeedData).triageRun || {};
   const rows = (triageRun.topPicks || triageRun.results || []) as DemoTriageResult[];
   return rows
     .filter(isFounderPick)
@@ -108,7 +116,7 @@ async function keepTyping(token: string, chatId: string) {
   await wait(900);
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     res.status(405).json({ ok: false, error: "Method not allowed." });
     return;

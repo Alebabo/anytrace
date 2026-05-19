@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, BrainCircuit, CheckCircle2, Database, Github, Linkedin, Play, Sparkles, Square } from "lucide-react";
+import { AlertTriangle, BrainCircuit, CheckCircle2, Database, Github, Globe2, Linkedin, Play, Smartphone, Sparkles, Square } from "lucide-react";
 import type { TriageResult } from "@/data/traqr";
 import { getBackendBaseUrl } from "@/hooks/useTraqr";
 import { getDemoTriageRun } from "@/lib/demoData";
@@ -91,6 +91,10 @@ const SWARM_STEPS: Array<{
     iconClass: "stroke-white",
   },
 ];
+
+const TELEGRAM_BOT_HANDLE = "traqrsignals_bot";
+const TELEGRAM_WEB_URL = `https://web.telegram.org/k/#@${TELEGRAM_BOT_HANDLE}`;
+const TELEGRAM_APP_URL = `tg://resolve?domain=${TELEGRAM_BOT_HANDLE}`;
 
 const NODE_ORDER = SWARM_STEPS.map((step) => step.id);
 const initialNodeStates = Object.fromEntries(NODE_ORDER.map((id) => [id, "idle"])) as Record<SwarmNodeId, SwarmNodeState>;
@@ -405,6 +409,7 @@ export default function AgentSwarmPage() {
   const [expandedPickId, setExpandedPickId] = useState<string | null>(() => initialExpandedPickId());
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const [infoPopup, setInfoPopup] = useState<string | null>(null);
+  const [telegramMenuOpen, setTelegramMenuOpen] = useState(false);
   const [nodeStates, setNodeStates] = useState<Record<SwarmNodeId, SwarmNodeState>>(() =>
     demoMode ? completeNodeStates : initialNodeStates,
   );
@@ -469,19 +474,34 @@ export default function AgentSwarmPage() {
         <img src="https://www.google.com/s2/favicons?domain=aistudio.google.com&sz=64" alt="" loading="lazy" />
         <strong>google ai studios</strong>
       </div>
-      <a
-        className="swarm-telegram-button"
-        href="https://t.me/traqrsignals_bot"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Open traqr Telegram bot"
-        title="Open Telegram bot"
-      >
-        <span className="telegram-button-icon" aria-hidden="true">
-          <img src="https://telegram.org/img/t_logo.svg" alt="" loading="lazy" />
-        </span>
-        <span>Open Telegram Bot</span>
-      </a>
+      <div className={telegramMenuOpen ? "swarm-telegram-launcher open" : "swarm-telegram-launcher"}>
+        <button
+          className="swarm-telegram-button"
+          type="button"
+          aria-expanded={telegramMenuOpen}
+          aria-haspopup="menu"
+          aria-label="Open traqr Telegram bot options"
+          title="Open Telegram bot"
+          onClick={() => setTelegramMenuOpen((open) => !open)}
+        >
+          <span className="telegram-button-icon" aria-hidden="true">
+            <img src="https://telegram.org/img/t_logo.svg" alt="" loading="lazy" />
+          </span>
+          <span>Open Telegram Bot</span>
+        </button>
+        {telegramMenuOpen ? (
+          <div className="swarm-telegram-menu" role="menu">
+            <a href={TELEGRAM_WEB_URL} target="_blank" rel="noreferrer" role="menuitem" onClick={() => setTelegramMenuOpen(false)}>
+              <Globe2 size={16} />
+              <span>Telegram Web</span>
+            </a>
+            <a href={TELEGRAM_APP_URL} role="menuitem" onClick={() => setTelegramMenuOpen(false)}>
+              <Smartphone size={16} />
+              <span>Telegram App</span>
+            </a>
+          </div>
+        ) : null}
+      </div>
       {infoPopup ? (
         <div className="swarm-info-popup" role="status" aria-live="polite">
           <span>i</span>

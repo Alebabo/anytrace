@@ -393,11 +393,17 @@ body:has(.voice-swarm-page) {
   white-space: nowrap;
 }
 
-.swarm-telegram-button {
+.swarm-telegram-launcher {
   position: fixed;
   right: clamp(10px, 1.6vw, 18px);
   bottom: clamp(8px, 1.4vw, 14px);
   z-index: 35;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.swarm-telegram-button {
   display: inline-flex;
   min-height: clamp(44px, 4.4vw, 54px);
   align-items: center;
@@ -411,6 +417,7 @@ body:has(.voice-swarm-page) {
   font-size: clamp(11px, 1vw, 13px);
   font-weight: 900;
   line-height: 1;
+  cursor: pointer;
   text-decoration: none;
   text-transform: uppercase;
   box-shadow: 0 0 0 2px #030303, 0 14px 32px rgb(34 158 217 / 0.34), 0 22px 42px rgb(0 0 0 / 0.16);
@@ -423,6 +430,11 @@ body:has(.voice-swarm-page) {
   background: #030303;
   animation: none;
   transform: translateY(-1px);
+}
+
+.swarm-telegram-launcher.open .swarm-telegram-button {
+  background: #030303;
+  animation: none;
 }
 
 .telegram-button-icon {
@@ -442,6 +454,40 @@ body:has(.voice-swarm-page) {
   width: 70%;
   height: 70%;
   object-fit: contain;
+}
+
+.swarm-telegram-menu {
+  display: grid;
+  width: min(210px, calc(100vw - 20px));
+  gap: 6px;
+  padding: 7px;
+  border: 2px solid #030303;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgb(0 0 0 / 0.18);
+}
+
+.swarm-telegram-menu a {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9px;
+  color: #030303;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.swarm-telegram-menu a:hover,
+.swarm-telegram-menu a:focus-visible {
+  outline: 0;
+  color: #ffffff;
+  background: #229ed9;
 }
 
 .swarm-lines {
@@ -1260,10 +1306,19 @@ body:has(.voice-swarm-page) {
     padding: 5px 7px;
   }
 
+  .swarm-telegram-launcher {
+    right: 8px;
+    bottom: 8px;
+  }
+
   .swarm-telegram-button {
     min-height: 42px;
     padding-right: 11px;
     gap: 7px;
+  }
+
+  .swarm-telegram-menu {
+    width: min(190px, calc(100vw - 16px));
   }
 
   .voice-orb-large {

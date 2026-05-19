@@ -20,6 +20,18 @@ type TelegramUpdatesResult = {
   result?: Array<{ message?: { chat?: { id?: number | string } } }>;
 };
 
+type ApiRequest = {
+  method?: string;
+  body?: string | Record<string, unknown>;
+  headers?: Record<string, string | string[] | undefined>;
+};
+
+type ApiResponse = {
+  status: (code: number) => {
+    json: (payload: Record<string, unknown>) => void;
+  };
+};
+
 export function cleanText(value: unknown, fallback = "") {
   return String(value || fallback)
     .replace(/[<>]/g, "")
@@ -32,7 +44,7 @@ function escapeHtml(value: unknown, fallback = "") {
     .replace(/"/g, "&quot;");
 }
 
-export function absoluteBaseUrl(req: any) {
+export function absoluteBaseUrl(req: ApiRequest) {
   const configuredUrl = process.env.TRAQR_PUBLIC_SITE_URL || process.env.VITE_SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
   if (configuredUrl) {
     const url = configuredUrl.startsWith("http") ? configuredUrl : `https://${configuredUrl}`;
@@ -140,4 +152,4 @@ export function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export type { TelegramPick };
+export type { ApiRequest, ApiResponse, TelegramPick };
