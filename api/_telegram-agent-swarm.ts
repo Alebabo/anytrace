@@ -14,6 +14,12 @@ type TelegramSendResult = {
   description?: string;
 };
 
+type TelegramUpdatesResult = {
+  ok?: boolean;
+  description?: string;
+  result?: Array<{ message?: { chat?: { id?: number | string } } }>;
+};
+
 export function cleanText(value: unknown, fallback = "") {
   return String(value || fallback)
     .replace(/[<>]/g, "")
@@ -27,8 +33,13 @@ function escapeHtml(value: unknown, fallback = "") {
 }
 
 export function absoluteBaseUrl(req: any) {
+  const configuredUrl = process.env.TRAQR_PUBLIC_SITE_URL || process.env.VITE_SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (configuredUrl) {
+    const url = configuredUrl.startsWith("http") ? configuredUrl : `https://${configuredUrl}`;
+    return url.replace(/\/$/, "");
+  }
   const proto = String(req.headers?.["x-forwarded-proto"] || "https").split(",")[0];
-  const host = String(req.headers?.["x-forwarded-host"] || req.headers?.host || "anytrace-kappa.vercel.app").split(",")[0];
+  const host = String(req.headers?.["x-forwarded-host"] || req.headers?.host || "traqr.ai").split(",")[0];
   return `${proto}://${host}`;
 }
 
@@ -52,7 +63,7 @@ export function formatMessage(picks: TelegramPick[], baseUrl: string) {
     const overview = escapeHtml(pick.overview);
     return `#${rank} <a href="${escapeHtml(url)}">${name}</a>${handle}\n${overview}`;
   });
-  return `<b>traqr.ai Agent Swarm - Founder Top Picks</b>\n\n${rows.join("\n\n")}\n\nTippe auf einen Namen oder Button, um die Details zu öffnen.`;
+  return `<b>traqr.ai Agent Swarm - Founder Top Picks</b>\n\n${rows.join("\n\n")}\n\nTippe auf einen Namen oder Button, um die Details zu oeffnen.`;
 }
 
 export function inlineKeyboard(picks: TelegramPick[], baseUrl: string) {
@@ -70,7 +81,14 @@ export function inlineKeyboard(picks: TelegramPick[], baseUrl: string) {
 export async function resolveChatId(token: string) {
   if (process.env.TELEGRAM_CHAT_ID) return process.env.TELEGRAM_CHAT_ID;
   const response = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
-  const payload = (await response.json()) as { ok?: boolean; result?: Array<{ message?: { chat?: { id?: number | string } } }> };
+  const payload = (await response.json()) as TelegramUpdatesResult;
+  if (!response.ok || payload.ok === false) {
+    const detail = payload.description || "Telegram getUpdates failed.";
+    if (detail.toLowerCase().includes("webhook")) {
+      throw new Error("Telegram webhook is active, so getUpdates cannot discover a chat id. Set TELEGRAM_CHAT_ID or use the chat-triggered webhook demo.");
+    }
+    throw new Error(detail);
+  }
   const chatId = payload.result?.slice().reverse().find((entry) => entry.message?.chat?.id)?.message?.chat?.id;
   return chatId ? String(chatId) : "";
 }

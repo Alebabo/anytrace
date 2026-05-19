@@ -20,14 +20,14 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const chatId = await resolveChatId(token);
-  if (!chatId) {
-    res.status(409).json({ ok: false, error: "Open the Telegram bot once, then run the demo again." });
-    return;
-  }
-
-  const baseUrl = absoluteBaseUrl(req);
   try {
+    const chatId = await resolveChatId(token);
+    if (!chatId) {
+      res.status(409).json({ ok: false, error: "Open the Telegram bot once, then run the demo again." });
+      return;
+    }
+
+    const baseUrl = absoluteBaseUrl(req);
     await sendTelegramTopPicks(token, chatId, topPicks, baseUrl);
   } catch (error) {
     res.status(502).json({ ok: false, error: error instanceof Error ? error.message : "Telegram send failed." });

@@ -44,12 +44,14 @@ TWEETAPI_PAGE_SIZE=100
 TWEETAPI_MAX_PAGES=6
 CRUNCHBASE_API_KEY=
 TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TRAQR_PUBLIC_SITE_URL=
 AGENT_SWARM_SEED_LIMIT=3
 ```
 
 Set `FEATHERLESS_TRIAGE_MOCK=true` only for local demo fallback without a Featherless key.
 
-Do not commit real secrets in `.env`. Use Vultr environment variables or a local untracked env file for `FEATHERLESS_API_KEY`, `TWEETAPI_KEY`, `GITHUB_TOKEN`, `LI_USERNAME`, `LI_PASSWORD`, `CRUNCHBASE_API_KEY`, and `TELEGRAM_BOT_TOKEN`.
+Do not commit real secrets in `.env`. Use Vultr environment variables or a local untracked env file for `FEATHERLESS_API_KEY`, `TWEETAPI_KEY`, `GITHUB_TOKEN`, `LI_USERNAME`, `LI_PASSWORD`, `CRUNCHBASE_API_KEY`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID`.
 
 ## AI workflow
 
@@ -63,7 +65,8 @@ Do not commit real secrets in `.env`. Use Vultr environment variables or a local
 - The `/agent-swarm` route presents the end-to-end workflow: X seed-source scanning, LinkedIn enrichment, GitHub builder proof, Featherless ranking, and delivery.
 - `api/agent-swarm-telegram.ts` sends selected founder top picks to Telegram.
 - `api/agent-swarm-telegram-webhook.ts` supports a chat-triggered demo flow.
-- Configure `TELEGRAM_BOT_TOKEN` and open the bot once so the endpoint can resolve a chat id.
+- Configure `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` for the UI-triggered send flow. If no `TELEGRAM_CHAT_ID` is set, the endpoint tries `getUpdates`, which only works while no Telegram webhook is active.
+- Configure `TRAQR_PUBLIC_SITE_URL` to the public HTTPS app URL so Telegram buttons open the right Traqr page.
 
 ## Native LinkedIn enrichment
 

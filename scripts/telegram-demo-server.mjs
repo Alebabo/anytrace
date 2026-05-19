@@ -1,4 +1,20 @@
+import fs from "node:fs";
 import http from "node:http";
+
+function loadLocalEnv() {
+  if (!fs.existsSync(".env")) return;
+  const rows = fs.readFileSync(".env", "utf8").split(/\r?\n/);
+  for (const row of rows) {
+    const trimmed = row.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const [key, ...valueParts] = trimmed.split("=");
+    if (!process.env[key]) {
+      process.env[key] = valueParts.join("=").replace(/^['"]|['"]$/g, "");
+    }
+  }
+}
+
+loadLocalEnv();
 
 const port = Number(process.env.PORT || 8788);
 const token = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -17,6 +33,11 @@ function escapeHtml(value, fallback = "") {
 }
 
 function absoluteBaseUrl(req) {
+  const configuredUrl = process.env.TRAQR_PUBLIC_SITE_URL || process.env.VITE_SITE_URL;
+  if (configuredUrl) {
+    const url = configuredUrl.startsWith("http") ? configuredUrl : `https://${configuredUrl}`;
+    return url.replace(/\/$/, "");
+  }
   const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0];
   const host = String(req.headers["x-forwarded-host"] || req.headers.host || "45.77.65.57").split(",")[0];
   return `${proto}://${host}`;
@@ -41,7 +62,7 @@ function formatMessage(picks, baseUrl) {
     const overview = escapeHtml(pick.overview);
     return `#${rank} <a href="${escapeHtml(url)}">${name}</a>${handle}\n${overview}`;
   });
-  return `<b>traqr.ai Agent Swarm - Founder Top Picks</b>\n\n${rows.join("\n\n")}\n\nTippe auf einen Namen oder Button, um die Details zu öffnen.`;
+  return `<b>traqr.ai Agent Swarm - Founder Top Picks</b>\n\n${rows.join("\n\n")}\n\nTippe auf einen Namen oder Button, um die Details zu oeffnen.`;
 }
 
 function inlineKeyboard(picks, baseUrl) {
@@ -60,6 +81,13 @@ async function resolveChatId() {
   if (configuredChatId) return configuredChatId;
   const response = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
   const payload = await response.json();
+  if (!response.ok || payload.ok === false) {
+    const detail = payload.description || "Telegram getUpdates failed.";
+    if (detail.toLowerCase().includes("webhook")) {
+      throw new Error("Telegram webhook is active, so getUpdates cannot discover a chat id. Set TELEGRAM_CHAT_ID or use the chat-triggered webhook demo.");
+    }
+    throw new Error(detail);
+  }
   const chatId = payload.result?.slice().reverse().find((entry) => entry.message?.chat?.id)?.message?.chat?.id;
   return chatId ? String(chatId) : "";
 }
